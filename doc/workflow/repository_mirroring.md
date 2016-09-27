@@ -26,3 +26,26 @@ When creating a new project, you can enable Repository Mirroring when you choose
 For existing projects, you can set up Repository Mirroring by navigating to Project Settings &gt; Mirror Repository.
 
 ![Settings](repository_mirroring/settings.png)
+
+### Adjusting synchronization times
+
+You can manually configure the repository synchronization times by setting the following configuration values. *These are cron formatted values.* 
+
+Please note that `update_all_mirrors_worker_cron` refers to the worker used for pulling changes from a remote mirror while `update_all_remote_mirrors_worker_cron` refers to the worker used for pushing changes to the remote mirror.
+
+**Omnibus installations**
+
+```
+# gitlab_rails['update_all_mirrors_worker_cron'] = "0 * * * *"
+# gitlab_rails['update_all_remote_mirrors_worker_cron'] = "30 * * * *"
+```
+
+**Source installations**
+
+```
+cron_jobs:
+    update_all_mirrors_worker_cron:
+      cron: "0 * * * *"
+    update_all_remote_mirrors_worker_cron:
+      cron: "30 * * * *"   
+```
