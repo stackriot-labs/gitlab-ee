@@ -31,6 +31,11 @@
 
         $btn.glDropdown({
           selectable: true,
+          isSelectable (selected, $el) {
+            const $link = $($el);
+
+            return $link.data('revert') ? false : true;
+          },
           fieldName: $btn.data('field-name'),
           id (selected, $el) {
             return $el.data('id');
