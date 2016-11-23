@@ -192,19 +192,19 @@ function initComponent(time_estimate = 100000, time_spent = 5000, human_time_est
           it('should not show the "Help" pane when help button is clicked and then closed', function(done) {
             $(this.timeTracker.$el).find('.help-button').click();
 
-            Vue.nextTick(() => {
+            setTimeout(() => {
 
               $(this.timeTracker.$el).find('.close-help-button').click();
 
-              Vue.nextTick(() => {
+              setTimeout(() => {
                 const $helpPane = this.timeTracker.$el.querySelector('.time-tracking-help-state');
 
                 expect(this.timeTracker.showHelpState).toBe(false);
                 expect($helpPane).toBeNull();
 
                 done();
-              });
-            });
+              }, 1000);
+            }, 1000);
           });
         });
       });
