@@ -284,7 +284,17 @@ describe 'Git LFS API and storage' do
           let(:authorization) { authorize_ci_project }
 
           shared_examples 'can download LFS only from own projects' do
-            context 'for own project' do
+            context 'for owned project' do
+              let(:project) { create(:empty_project, namespace: user.namespace) }
+
+              let(:update_permissions) do
+                project.lfs_objects << lfs_object
+              end
+
+              it_behaves_like 'responds with a file'
+            end
+
+            context 'for member of project' do
               let(:pipeline) { create(:ci_empty_pipeline, project: project) }
 
               let(:update_permissions) do
@@ -930,6 +940,17 @@ describe 'Git LFS API and storage' do
 
             it 'lfs object is linked to the project' do
               expect(lfs_object.projects.pluck(:id)).to include(project.id)
+            end
+          end
+
+          context 'and project has limit enabled but will stay under the limit' do
+            before do
+              allow_any_instance_of(Project).to receive_messages(actual_size_limit: 200, size_limit_enabled?: true)
+              put_finalize
+            end
+
+            it 'responds with status 200' do
+              expect(response).to have_http_status(200)
             end
           end
 

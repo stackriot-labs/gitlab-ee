@@ -1,6 +1,6 @@
-## GitLab CI Documentation
+# GitLab CI Documentation
 
-### CI User documentation
+## CI User documentation
 
 - [Get started with GitLab CI](quick_start/README.md)
 - [CI examples for various languages](examples/README.md)
@@ -19,4 +19,9 @@
 - [Build permissions](../user/permissions.md#build-permissions)
 - [API](../api/ci/README.md)
 - [CI services (linked docker containers)](services/README.md)
-- [**New CI build permissions model**](../user/project/new_ci_build_permissions_model.md) Read about what changed in GitLab 8.12 and how that affects your builds. There's a new way to access your Git submodules and LFS objects in builds.
+- [CI/CD pipelines settings](../user/project/pipelines/settings.md)
+- [Review Apps](review_apps/index.md)
+
+## Breaking changes
+
+- [New CI build permissions model](../user/project/new_ci_build_permissions_model.md) Read about what changed in GitLab 8.12 and how that affects your builds. There's a new way to access your Git submodules and LFS objects in builds.

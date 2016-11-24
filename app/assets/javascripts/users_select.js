@@ -1,3 +1,4 @@
+/* eslint-disable func-names, space-before-function-paren, one-var, no-var, space-before-blocks, prefer-rest-params, wrap-iife, quotes, max-len, one-var-declaration-per-line, vars-on-top, prefer-arrow-callback, consistent-return, no-undef, comma-dangle, object-shorthand, no-shadow, no-unused-vars, no-plusplus, no-else-return, no-self-compare, prefer-template, no-unused-expressions, no-lonely-if, yoda, prefer-spread, no-void, camelcase, keyword-spacing, no-param-reassign, padded-blocks, max-len */
 (function() {
   var bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; },
     slice = [].slice;
@@ -9,7 +10,11 @@
       this.usersPath = "/autocomplete/users.json";
       this.userPath = "/autocomplete/users/:id.json";
       if (currentUser != null) {
-        this.currentUser = JSON.parse(currentUser);
+        if (typeof currentUser === 'object') {
+          this.currentUser = currentUser;
+        } else {
+          this.currentUser = JSON.parse(currentUser);
+        }
       }
       $('.js-user-search').each((function(_this) {
         return function(i, dropdown) {
@@ -18,6 +23,8 @@
           $dropdown = $(dropdown);
           options.projectId = $dropdown.data('project-id');
           options.showCurrentUser = $dropdown.data('current-user');
+          options.todoFilter = $dropdown.data('todo-filter');
+          options.todoStateFilter = $dropdown.data('todo-state-filter');
           showNullUser = $dropdown.data('null-user');
           showMenuAbove = $dropdown.data('showMenuAbove');
           showAnyUser = $dropdown.data('any-user');
@@ -32,9 +39,30 @@
           $value = $block.find('.value');
           $collapsedSidebar = $block.find('.sidebar-collapsed-user');
           $loading = $block.find('.block-loading').fadeOut();
+
+          var updateIssueBoardsIssue = function () {
+            $loading.fadeIn();
+            gl.issueBoards.BoardsStore.detail.issue.update($dropdown.attr('data-issue-update'))
+              .then(function () {
+                $loading.fadeOut();
+              });
+          };
+
           $block.on('click', '.js-assign-yourself', function(e) {
             e.preventDefault();
-            return assignTo(_this.currentUser.id);
+
+            if ($dropdown.hasClass('js-issue-board-sidebar')) {
+              Vue.set(gl.issueBoards.BoardsStore.detail.issue, 'assignee', new ListUser({
+                id: _this.currentUser.id,
+                username: _this.currentUser.username,
+                name: _this.currentUser.name,
+                avatar_url: _this.currentUser.avatar_url
+              }));
+
+              updateIssueBoardsIssue();
+            } else {
+              return assignTo(_this.currentUser.id);
+            }
           });
           assignTo = function(selected) {
             var data;
@@ -150,6 +178,7 @@
               // display:block overrides the hide-collapse rule
               return $value.css('display', '');
             },
+            vue: $dropdown.hasClass('js-issue-board-sidebar'),
             clicked: function(user, $el, e) {
               var isIssueIndex, isMRIndex, page, selected;
               page = $('body').data('page');
@@ -160,7 +189,7 @@
                 selectedId = user.id;
                 return;
               }
-              if ($('html').hasClass('issue-boards-page')) {
+              if ($('html').hasClass('issue-boards-page') && !$dropdown.hasClass('js-issue-board-sidebar')) {
                 selectedId = user.id;
                 gl.issueBoards.BoardsStore.state.filters[$dropdown.data('field-name')] = user.id;
                 gl.issueBoards.BoardsStore.updateFiltersUrl();
@@ -170,6 +199,19 @@
                 return Issuable.filterResults($dropdown.closest('form'));
               } else if ($dropdown.hasClass('js-filter-submit')) {
                 return $dropdown.closest('form').submit();
+              } else if ($dropdown.hasClass('js-issue-board-sidebar')) {
+                if (user.id) {
+                  Vue.set(gl.issueBoards.BoardsStore.detail.issue, 'assignee', new ListUser({
+                    id: user.id,
+                    username: user.username,
+                    name: user.name,
+                    avatar_url: user.avatar_url
+                  }));
+                } else {
+                  Vue.delete(gl.issueBoards.BoardsStore.detail.issue, 'assignee');
+                }
+
+                updateIssueBoardsIssue();
               } else {
                 selected = $dropdown.closest('.selectbox').find("input[name='" + ($dropdown.data('field-name')) + "']").val();
                 return assignTo(selected);
@@ -354,6 +396,8 @@
           project_id: options.projectId || null,
           group_id: options.groupId || null,
           skip_ldap: options.skipLdap || null,
+          todo_filter: options.todoFilter || null,
+          todo_state_filter: options.todoStateFilter || null,
           current_user: options.showCurrentUser || null,
           push_code_to_protected_branches: options.pushCodeToProtectedBranches || null,
           author_id: options.authorId || null,

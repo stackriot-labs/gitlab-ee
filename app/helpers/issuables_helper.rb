@@ -30,6 +30,37 @@ module IssuablesHelper
     end
   end
 
+  def serialize_issuable(issuable)
+    case issuable
+    when Issue
+      IssueSerializer.new.represent(issuable).to_json
+    when MergeRequest
+      MergeRequestSerializer.new.represent(issuable).to_json
+    end
+  end
+
+  def template_dropdown_tag(issuable, &block)
+    title = selected_template(issuable) || "Choose a template"
+    options = {
+      toggle_class: 'js-issuable-selector',
+      title: title,
+      filter: true,
+      placeholder: 'Filter',
+      footer_content: true,
+      data: {
+        data: issuable_templates(issuable),
+        field_name: 'issuable_template',
+        selected: selected_template(issuable),
+        project_path: ref_project.path,
+        namespace_path: ref_project.namespace.path
+      }
+    }
+
+    dropdown_tag(title, options: options) do
+      capture(&block)
+    end
+  end
+
   def user_dropdown_label(user_id, default_label)
     return default_label if user_id.nil?
     return "Unassigned" if user_id == "0"
@@ -71,6 +102,14 @@ module IssuablesHelper
       author_output = link_to_member(project, issuable.author, size: 24, mobile_classes: "hidden-xs", tooltip: true)
       author_output << link_to_member(project, issuable.author, size: 24, by_username: true, avatar: false, mobile_classes: "hidden-sm hidden-md hidden-lg")
     end
+
+    if issuable.tasks?
+      output << "&ensp;".html_safe
+      output << content_tag(:span, issuable.task_status, id: "task_status", class: "hidden-xs")
+      output << content_tag(:span, issuable.task_status_short, id: "task_status_short", class: "hidden-sm hidden-md hidden-lg")
+    end
+
+    output
   end
 
   def issuable_todo(issuable)
@@ -106,7 +145,18 @@ module IssuablesHelper
     html.html_safe
   end
 
+  def cached_assigned_issuables_count(assignee, issuable_type, state)
+    cache_key = hexdigest(['assigned_issuables_count', assignee.id, issuable_type, state].join('-'))
+    Rails.cache.fetch(cache_key, expires_in: 2.minutes) do
+      assigned_issuables_count(assignee, issuable_type, state)
+    end
+  end
+
   private
+
+  def assigned_issuables_count(assignee, issuable_type, state)
+    assignee.public_send("assigned_#{issuable_type}").public_send(state).count
+  end
 
   def sidebar_gutter_collapsed?
     cookies[:collapsed_gutter] == 'true'
@@ -130,9 +180,11 @@ module IssuablesHelper
 
   def issuables_count_for_state(issuable_type, state)
     issuables_finder = public_send("#{issuable_type}_finder")
-    issuables_finder.params[:state] = state
+    
+    params = issuables_finder.params.merge(state: state)
+    finder = issuables_finder.class.new(issuables_finder.current_user, params)
 
-    issuables_finder.execute.page(1).total_count
+    finder.execute.page(1).total_count
   end
 
   IRRELEVANT_PARAMS_FOR_CACHE_KEY = %i[utf8 sort page]
@@ -144,5 +196,29 @@ module IssuablesHelper
     opts.except!(*IRRELEVANT_PARAMS_FOR_CACHE_KEY)
 
     hexdigest(['issuables_count', issuable_type, opts.sort].flatten.join('-'))
+  end
+
+  def issuable_templates(issuable)
+    @issuable_templates ||=
+      case issuable
+      when Issue
+        issue_template_names
+      when MergeRequest
+        merge_request_template_names
+      else
+        raise 'Unknown issuable type!'
+      end
+  end
+
+  def merge_request_template_names
+    @merge_request_templates ||= Gitlab::Template::MergeRequestTemplate.dropdown_names(ref_project)
+  end
+
+  def issue_template_names
+    @issue_templates ||= Gitlab::Template::IssueTemplate.dropdown_names(ref_project)
+  end
+
+  def selected_template(issuable)
+    params[:issuable_template] if issuable_templates(issuable).include?(params[:issuable_template])
   end
 end

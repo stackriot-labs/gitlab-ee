@@ -1,3 +1,4 @@
+/* eslint-disable */
 //= require vue
 //= require vue-resource
 //= require Sortable
@@ -5,8 +6,10 @@
 //= require_tree ./stores
 //= require_tree ./services
 //= require_tree ./mixins
+//= require_tree ./filters
 //= require ./components/board
 //= require ./components/boards_selector
+//= require ./components/board_sidebar
 //= require ./components/new_list_dropdown
 //= require ./vue_resource_interceptor
 
@@ -20,11 +23,14 @@ $(() => {
     gl.IssueBoardsApp.$destroy(true);
   }
 
+  Store.create();
+
   gl.IssueBoardsApp = new Vue({
     el: $boardApp,
     components: {
       'board': gl.issueBoards.Board,
-      'boards-selector': gl.issueBoards.BoardsSelector
+      'boards-selector': gl.issueBoards.BoardsSelector,
+      'board-sidebar': gl.issueBoards.BoardSidebar
     },
     data: {
       state: Store.state,
@@ -32,13 +38,18 @@ $(() => {
       endpoint: $boardApp.dataset.endpoint,
       boardId: $boardApp.dataset.boardId,
       disabled: $boardApp.dataset.disabled === 'true',
-      issueLinkBase: $boardApp.dataset.issueLinkBase
+      issueLinkBase: $boardApp.dataset.issueLinkBase,
+      detailIssue: Store.detail
     },
-    init: Store.create.bind(Store),
+    computed: {
+      detailIssueVisible () {
+        return Object.keys(this.detailIssue.issue).length;
+      },
+    },
     created () {
       gl.boardService = new BoardService(this.endpoint, this.boardId);
     },
-    ready () {
+    mounted () {
       Store.disabled = this.disabled;
       gl.boardService.all()
         .then((resp) => {
@@ -52,6 +63,8 @@ $(() => {
             }
           });
 
+          this.state.lists = _.sortBy(this.state.lists, 'position');
+
           Store.addBlankState();
           this.loading = false;
         });
@@ -62,6 +75,9 @@ $(() => {
     el: '#js-boards-seach',
     data: {
       filters: Store.state.filters
+    },
+    mounted () {
+      gl.issueBoards.newListDropdownInit();
     }
   });
 });

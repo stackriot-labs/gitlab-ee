@@ -12,6 +12,8 @@ module Issuable
   include Subscribable
   include StripAttribute
   include Awardable
+  include Taskable
+  include TimeTrackable
 
   included do
     cache_markdown_field :title, pipeline: :single_line
@@ -185,6 +187,10 @@ module Issuable
 
       grouping_columns
     end
+
+    def to_ability_name
+      model_name.singular
+    end
   end
 
   def today?
@@ -213,7 +219,7 @@ module Issuable
     end
   end
 
-  def subscribed_without_subscriptions?(user)
+  def subscribed_without_subscriptions?(user, project)
     participants(user).include?(user)
   end
 
@@ -246,7 +252,18 @@ module Issuable
   #   issuable.class           # => MergeRequest
   #   issuable.to_ability_name # => "merge_request"
   def to_ability_name
-    self.class.to_s.underscore
+    self.class.to_ability_name
+  end
+
+  # Convert this Issuable class name to a format usable by notifications.
+  #
+  # Examples:
+  #
+  #   issuable.class           # => MergeRequest
+  #   issuable.human_class_name # => "merge request"
+
+  def human_class_name
+    @human_class_name ||= self.class.name.titleize.downcase
   end
 
   # Returns a Hash of attributes to be used for Twitter card metadata
@@ -286,6 +303,11 @@ module Issuable
   #
   def can_move?(*)
     false
+  end
+
+  def assignee_or_author?(user)
+    # We're comparing IDs here so we don't need to load any associations.
+    author_id == user.id || assignee_id == user.id
   end
 
   def record_metrics

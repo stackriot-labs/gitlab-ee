@@ -1,3 +1,4 @@
+/* eslint-disable func-names, space-before-function-paren, no-var, prefer-arrow-callback, no-unused-vars, one-var, one-var-declaration-per-line, indent, vars-on-top, padded-blocks, max-len */
 (function() {
   var hideEndFade;
 

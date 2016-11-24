@@ -43,14 +43,13 @@ module API
     end
 
     class Hook < Grape::Entity
-      expose :id, :url, :created_at
+      expose :id, :url, :created_at, :push_events, :tag_push_events
+      expose :enable_ssl_verification
     end
 
     class ProjectHook < Hook
-      expose :project_id, :push_events
-      expose :issues_events, :merge_requests_events, :tag_push_events
+      expose :project_id, :issues_events, :merge_requests_events
       expose :note_events, :build_events, :pipeline_events, :wiki_page_events
-      expose :enable_ssl_verification
     end
 
     class ProjectPushRule < Grape::Entity
@@ -107,6 +106,8 @@ module API
       expose :repository_storage, if: lambda { |_project, options| options[:user].try(:admin?) }
       expose :only_allow_merge_if_build_succeeds
       expose :request_access_enabled
+      expose :only_allow_merge_if_all_discussions_are_resolved
+      expose :approvals_before_merge
     end
 
     class Member < UserBasic
@@ -154,7 +155,7 @@ module API
       expose :name
 
       expose :commit do |repo_branch, options|
-        options[:project].repository.commit(repo_branch.target)
+        options[:project].repository.commit(repo_branch.dereferenced_target)
       end
 
       expose :protected do |repo_branch, options|
@@ -175,7 +176,7 @@ module API
     end
 
     class RepoTreeObject < Grape::Entity
-      expose :id, :name, :type
+      expose :id, :name, :type, :path
 
       expose :mode do |obj, options|
         filemode = obj.mode.to_s(8)
@@ -234,7 +235,7 @@ module API
       expose :assignee, :author, using: Entities::UserBasic
 
       expose :subscribed do |issue, options|
-        issue.subscribed?(options[:current_user])
+        issue.subscribed?(options[:current_user], options[:project] || issue.project)
       end
       expose :user_notes_count
       expose :upvotes, :downvotes
@@ -263,9 +264,11 @@ module API
       expose :merge_status
       expose :diff_head_sha, as: :sha
       expose :merge_commit_sha
+
       expose :subscribed do |merge_request, options|
-        merge_request.subscribed?(options[:current_user])
+        merge_request.subscribed?(options[:current_user], options[:project])
       end
+
       expose :user_notes_count
       expose :approvals_before_merge
       expose :should_remove_source_branch?, as: :should_remove_source_branch
@@ -465,14 +468,28 @@ module API
     end
 
     class LabelBasic < Grape::Entity
-      expose :name, :color, :description
+      expose :id, :name, :color, :description
     end
 
     class Label < LabelBasic
-      expose :open_issues_count, :closed_issues_count, :open_merge_requests_count
+      expose :open_issues_count do |label, options|
+        label.open_issues_count(options[:current_user])
+      end
+
+      expose :closed_issues_count do |label, options|
+        label.closed_issues_count(options[:current_user])
+      end
+
+      expose :open_merge_requests_count do |label, options|
+        label.open_merge_requests_count(options[:current_user])
+      end
+
+      expose :priority do |label, options|
+        label.priority(options[:project])
+      end
 
       expose :subscribed do |label, options|
-        label.subscribed?(options[:current_user])
+        label.subscribed?(options[:current_user], options[:project])
       end
     end
 
@@ -542,6 +559,7 @@ module API
       expose :after_sign_out_path
       expose :container_registry_token_expire_delay
       expose :repository_storage
+      expose :repository_storages
       expose :koding_enabled
       expose :koding_url
     end
@@ -555,7 +573,7 @@ module API
       expose :name, :message
 
       expose :commit do |repo_tag, options|
-        options[:project].repository.commit(repo_tag.target)
+        options[:project].repository.commit(repo_tag.dereferenced_target)
       end
 
       expose :release, using: Entities::Release do |repo_tag, options|

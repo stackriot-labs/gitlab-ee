@@ -55,6 +55,10 @@
     float: left;
   }
 
+  .file-buttons {
+    font-size: 0;
+  }
+
   .select2 {
     float: right;
   }
@@ -91,7 +95,9 @@
     }
   }
 
-  .gitignore-selector, .license-selector, .gitlab-ci-yml-selector {
+  .gitignore-selector,
+  .license-selector,
+  .gitlab-ci-yml-selector {
     .dropdown {
       line-height: 21px;
     }

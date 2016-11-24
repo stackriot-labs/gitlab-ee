@@ -186,14 +186,14 @@ describe API::API, api: true  do
   end
 
   describe 'GET /projects/:id/merge_requests/:merge_request_id/commits' do
-    context 'valid merge request' do
-      before { get api("/projects/#{project.id}/merge_requests/#{merge_request.id}/commits", user) }
-      let(:commit) { merge_request.commits.first }
+    it 'returns a 200 when merge request is valid' do
+      get api("/projects/#{project.id}/merge_requests/#{merge_request.id}/commits", user)
+      commit = merge_request.commits.first
 
-      it { expect(response.status).to eq 200 }
-      it { expect(json_response.size).to eq(merge_request.commits.size) }
-      it { expect(json_response.first['id']).to eq(commit.id) }
-      it { expect(json_response.first['title']).to eq(commit.title) }
+      expect(response.status).to eq 200
+      expect(json_response.size).to eq(merge_request.commits.size)
+      expect(json_response.first['id']).to eq(commit.id)
+      expect(json_response.first['title']).to eq(commit.title)
     end
 
     it 'returns a 404 when merge_request_id not found' do
@@ -554,12 +554,6 @@ describe API::API, api: true  do
       expect(json_response['milestone']['id']).to eq(milestone.id)
     end
 
-    it "returns 400 when source_branch is specified" do
-      put api("/projects/#{project.id}/merge_requests/#{merge_request.id}", user),
-      source_branch: "master", target_branch: "master"
-      expect(response).to have_http_status(400)
-    end
-
     it "returns merge_request with renamed target_branch" do
       put api("/projects/#{project.id}/merge_requests/#{merge_request.id}", user), target_branch: "wiki"
       expect(response).to have_http_status(200)
@@ -702,12 +696,18 @@ describe API::API, api: true  do
 
   describe 'GET :id/merge_requests/:merge_request_id/approvals' do
     it 'retrieves the approval status' do
+      approver = create :user
       project.update_attribute(:approvals_before_merge, 2)
+      project.team << [approver, :developer]
+      project.team << [create(:user), :developer]
+      merge_request.approvals.create(user: approver)
 
       get api("/projects/#{project.id}/merge_requests/#{merge_request.id}/approvals", user)
 
       expect(response.status).to eq(200)
       expect(json_response['approvals_required']).to eq 2
+      expect(json_response['approvals_left']).to eq 1
+      expect(json_response['approved_by'][0]['user']['username']).to eq(approver.username)
     end
   end
 

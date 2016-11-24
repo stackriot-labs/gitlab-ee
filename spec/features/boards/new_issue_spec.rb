@@ -46,7 +46,7 @@ describe 'Issue Boards new issue', feature: true, js: true do
 
         click_button 'Cancel'
 
-        expect(page).to have_selector('.board-new-issue-form', visible: false)
+        expect(page).not_to have_selector('.board-new-issue-form')
       end
     end
 
@@ -65,6 +65,21 @@ describe 'Issue Boards new issue', feature: true, js: true do
       page.within(first('.board .board-issue-count')) do
         expect(page).to have_content('1')
       end
+    end
+
+    it 'shows sidebar when creating new issue' do
+      page.within(first('.board')) do
+        find('.board-issue-count-holder .btn').click
+      end
+
+      page.within(first('.board-new-issue-form')) do
+        find('.form-control').set('bug')
+        click_button 'Submit issue'
+      end
+
+      wait_for_vue_resource
+
+      expect(page).to have_selector('.issue-boards-sidebar')
     end
   end
 

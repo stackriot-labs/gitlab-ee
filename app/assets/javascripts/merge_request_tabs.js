@@ -1,9 +1,10 @@
+/* eslint-disable max-len, func-names, space-before-function-paren, no-var, space-before-blocks, prefer-rest-params, wrap-iife, no-use-before-define, no-underscore-dangle, no-undef, one-var, one-var-declaration-per-line, quotes, comma-dangle, consistent-return, prefer-template, no-param-reassign, camelcase, vars-on-top, space-in-parens, curly, prefer-arrow-callback, no-unused-vars, no-return-assign, semi, object-shorthand, operator-assignment, padded-blocks, max-len */
 // MergeRequestTabs
 //
 // Handles persisting and restoring the current tab selection and lazily-loading
 // content on the MergeRequests#show page.
 //
-/*= require jquery.cookie */
+/*= require js.cookie */
 
 //
 // ### Example Markup
@@ -129,7 +130,7 @@
     MergeRequestTabs.prototype.scrollToElement = function(container) {
       var $el, navBarHeight;
       if (window.location.hash) {
-        navBarHeight = $('.navbar-gitlab').outerHeight() + $('.layout-nav').outerHeight();
+        navBarHeight = $('.navbar-gitlab').outerHeight() + $('.layout-nav').outerHeight() + document.querySelector('.js-tabs-affix').offsetHeight;
         $el = $(container + " " + window.location.hash + ":not(.match)");
         if ($el.length) {
           return $.scrollTo(container + " " + window.location.hash + ":not(.match)", {
@@ -144,7 +145,8 @@
       if (action === 'show') {
         action = 'notes';
       }
-      $(".merge-request-tabs a[data-action='" + action + "']").tab('show').trigger('shown.bs.tab');
+      // important note: the .tab('show') method triggers 'shown.bs.tab' event itself
+      $(".merge-request-tabs a[data-action='" + action + "']").tab('show');
     };
 
     // Replaces the current Merge Request-specific action in the URL with a new one
@@ -226,8 +228,8 @@
           return function(data) {
             $('#diffs').html(data.html);
 
-            if (typeof DiffNotesApp !== 'undefined') {
-              DiffNotesApp.compileComponents();
+            if (typeof gl.diffNotesCompileComponents !== 'undefined') {
+              gl.diffNotesCompileComponents();
             }
 
             gl.utils.localTimeAgo($('.js-timeago', 'div#diffs'));
@@ -237,8 +239,11 @@
               _this.expandViewContainer();
             }
             _this.diffsLoaded = true;
-            _this.scrollToElement("#diffs");
-            _this.highlighSelectedLine();
+            var anchoredDiff = gl.utils.getLocationHash();
+            if (anchoredDiff) _this.openAnchoredDiff(anchoredDiff, function() {
+              _this.scrollToElement("#diffs");
+              _this.highlighSelectedLine();
+            });
             _this.filesCommentButton = $('.files .diff-file').filesCommentButton();
             return $(document).off('click', '.diff-line-num a').on('click', '.diff-line-num a', function(e) {
               e.preventDefault();
@@ -249,6 +254,17 @@
           };
         })(this)
       });
+    };
+
+    MergeRequestTabs.prototype.openAnchoredDiff = function(anchoredDiff, cb) {
+      var diffTitle = $('#file-path-' + anchoredDiff);
+      var diffFile = diffTitle.closest('.diff-file');
+      var nothingHereBlock = $('.nothing-here-block:visible', diffFile);
+      if (nothingHereBlock.length) {
+        diffFile.singleFileDiff(true, cb);
+      } else {
+        cb();
+      }
     };
 
     MergeRequestTabs.prototype.highlighSelectedLine = function() {
@@ -368,7 +384,7 @@
 
     MergeRequestTabs.prototype.expandView = function() {
       var $gutterIcon;
-      if ($.cookie('collapsed_gutter') === 'true') {
+      if (Cookies.get('collapsed_gutter') === 'true') {
         return;
       }
       $gutterIcon = $('.js-sidebar-toggle i:visible');

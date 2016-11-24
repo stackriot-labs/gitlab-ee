@@ -142,6 +142,9 @@ gitlab-workhorse we need a Go compiler. The instructions below assume you
 use 64-bit Linux. You can find downloads for other platforms at the [Go download
 page](https://golang.org/dl).
 
+    # Remove former Go installation folder
+    sudo rm -rf /usr/local/go
+
     curl --remote-name --progress https://storage.googleapis.com/golang/go1.5.3.linux-amd64.tar.gz
     echo '43afe0c5017e502630b1aea4d44b8a7f059bf60d7f29dfd58db454d4e4e0ae53  go1.5.3.linux-amd64.tar.gz' | shasum -a256 -c - && \
       sudo tar -C /usr/local -xzf go1.5.3.linux-amd64.tar.gz
@@ -268,9 +271,9 @@ sudo usermod -aG redis git
 ### Clone the Source
 
     # Clone GitLab repository
-    sudo -u git -H git clone https://gitlab.com/gitlab-org/gitlab-ce.git -b 8-13-stable gitlab
+    sudo -u git -H git clone https://gitlab.com/gitlab-org/gitlab-ce.git -b 8-14-stable gitlab
 
-**Note:** You can change `8-13-stable` to `master` if you want the *bleeding edge* version, but never install master on a production server!
+**Note:** You can change `8-14-stable` to `master` if you want the *bleeding edge* version, but never install master on a production server!
 
 ### Configure It
 
@@ -403,7 +406,7 @@ If you are not using Linux you may have to run `gmake` instead of
     cd /home/git
     sudo -u git -H git clone https://gitlab.com/gitlab-org/gitlab-workhorse.git
     cd gitlab-workhorse
-    sudo -u git -H git checkout v0.8.5
+    sudo -u git -H git checkout v1.0.0
     sudo -u git -H make
 
 ### Initialize Database and Activate Advanced Features
@@ -479,10 +482,14 @@ Copy the example site config:
     sudo cp lib/support/nginx/gitlab /etc/nginx/sites-available/gitlab
     sudo ln -s /etc/nginx/sites-available/gitlab /etc/nginx/sites-enabled/gitlab
 
-Make sure to edit the config file to match your setup:
+Make sure to edit the config file to match your setup. Also, ensure that you match your paths to GitLab, especially if installing for a user other than the 'git' user:
 
     # Change YOUR_SERVER_FQDN to the fully-qualified
     # domain name of your host serving GitLab.
+    #
+    # Remember to match your paths to GitLab, especially
+    # if installing for a user other than 'git'.
+    #
     # If using Ubuntu default nginx install:
     # either remove the default_server from the listen line
     # or else sudo rm -f /etc/nginx/sites-enabled/default

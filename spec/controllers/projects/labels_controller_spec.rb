@@ -2,7 +2,7 @@ require 'spec_helper'
 
 describe Projects::LabelsController do
   let(:group)   { create(:group) }
-  let(:project) { create(:project, namespace: group) }
+  let(:project) { create(:empty_project, namespace: group) }
   let(:user)    { create(:user) }
 
   before do
@@ -72,17 +72,44 @@ describe Projects::LabelsController do
   end
 
   describe 'POST #generate' do
-    let(:admin) { create(:admin) }
-    let(:project) { create(:empty_project) }
+    context 'personal project' do
+      let(:personal_project) { create(:empty_project, namespace: user.namespace) }
 
-    before do
-      sign_in(admin)
+      it 'creates labels' do
+        post :generate, namespace_id: personal_project.namespace.to_param, project_id: personal_project.to_param
+
+        expect(response).to have_http_status(302)
+      end
     end
 
-    it 'creates labels' do
-      post :generate, namespace_id: project.namespace.to_param, project_id: project.to_param
+    context 'project belonging to a group' do
+      it 'creates labels' do
+        post :generate, namespace_id: project.namespace.to_param, project_id: project.to_param
 
-      expect(response).to have_http_status(302)
+        expect(response).to have_http_status(302)
+      end
+    end
+  end
+
+  describe 'POST #toggle_subscription' do
+    it 'allows user to toggle subscription on project labels' do
+      label = create(:label, project: project)
+
+      toggle_subscription(label)
+
+      expect(response).to have_http_status(200)
+    end
+
+    it 'allows user to toggle subscription on group labels' do
+      group_label = create(:group_label, group: group)
+
+      toggle_subscription(group_label)
+
+      expect(response).to have_http_status(200)
+    end
+
+    def toggle_subscription(label)
+      post :toggle_subscription, namespace_id: project.namespace.to_param, project_id: project.to_param, id: label.to_param
     end
   end
 end

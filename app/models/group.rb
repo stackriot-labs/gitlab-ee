@@ -8,8 +8,9 @@ class Group < Namespace
   include Gitlab::VisibilityLevel
   include AccessRequestable
   include Referable
+  include SelectForProjectAuthorization
 
-  has_many :group_members, -> { where(requested_at: nil) }, dependent: :destroy, as: :source, class_name: 'GroupMember'
+  has_many :group_members, -> { where(requested_at: nil) }, dependent: :destroy, as: :source
   alias_method :members, :group_members
   has_many :users, through: :group_members
   has_many :owners,
@@ -76,6 +77,14 @@ class Group < Namespace
     def visible_to_user(user)
       where(id: user.authorized_groups.select(:id).reorder(nil))
     end
+
+    def select_for_project_authorization
+      if current_scope.joins_values.include?(:shared_projects)
+        select("members.user_id, projects.id AS project_id, project_group_links.group_access")
+      else
+        super
+      end
+    end
   end
 
   def to_reference(_from_project = nil)
@@ -83,7 +92,7 @@ class Group < Namespace
   end
 
   def web_url
-    Gitlab::Routing.url_helpers.group_url(self)
+    Gitlab::Routing.url_helpers.group_canonical_url(self)
   end
 
   def human_name
@@ -218,5 +227,9 @@ class Group < Namespace
 
   def first_non_empty_project
     projects.detect{ |project| !project.empty_repo? }
+  end
+
+  def refresh_members_authorized_projects
+    UserProjectAccessChangedService.new(users.pluck(:id)).execute
   end
 end

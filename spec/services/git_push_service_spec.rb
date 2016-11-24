@@ -27,27 +27,14 @@ describe GitPushService, services: true do
 
       it { is_expected.to be_truthy }
 
-      it 'flushes general cached data' do
-        expect(project.repository).to receive(:expire_cache).
-          with('master', newrev)
+      it 'calls the after_push_commit hook' do
+        expect(project.repository).to receive(:after_push_commit).with('master')
 
         subject
       end
 
-      it 'flushes the visible content cache' do
-        expect(project.repository).to receive(:expire_has_visible_content_cache)
-
-        subject
-      end
-
-      it 'flushes the branches cache' do
-        expect(project.repository).to receive(:expire_branches_cache)
-
-        subject
-      end
-
-      it 'flushes the branch count cache' do
-        expect(project.repository).to receive(:expire_branch_count_cache)
+      it 'calls the after_create_branch hook' do
+        expect(project.repository).to receive(:after_create_branch)
 
         subject
       end
@@ -56,21 +43,8 @@ describe GitPushService, services: true do
     context 'existing branch' do
       it { is_expected.to be_truthy }
 
-      it 'flushes general cached data' do
-        expect(project.repository).to receive(:expire_cache).
-          with('master', newrev)
-
-        subject
-      end
-
-      it 'does not flush the branches cache' do
-        expect(project.repository).not_to receive(:expire_branches_cache)
-
-        subject
-      end
-
-      it 'does not flush the branch count cache' do
-        expect(project.repository).not_to receive(:expire_branch_count_cache)
+      it 'calls the after_push_commit hook' do
+        expect(project.repository).to receive(:after_push_commit).with('master')
 
         subject
       end
@@ -81,27 +55,14 @@ describe GitPushService, services: true do
 
       it { is_expected.to be_truthy }
 
-      it 'flushes the visible content cache' do
-        expect(project.repository).to receive(:expire_has_visible_content_cache)
+      it 'calls the after_push_commit hook' do
+        expect(project.repository).to receive(:after_push_commit).with('master')
 
         subject
       end
 
-      it 'flushes the branches cache' do
-        expect(project.repository).to receive(:expire_branches_cache)
-
-        subject
-      end
-
-      it 'flushes the branch count cache' do
-        expect(project.repository).to receive(:expire_branch_count_cache)
-
-        subject
-      end
-
-      it 'flushes general cached data' do
-        expect(project.repository).to receive(:expire_cache).
-          with('master', newrev)
+      it 'calls the after_remove_branch hook' do
+        expect(project.repository).to receive(:after_remove_branch)
 
         subject
       end
@@ -326,6 +287,9 @@ describe GitPushService, services: true do
         author_email: commit_author.email
       )
 
+      allow_any_instance_of(ProcessCommitWorker).to receive(:find_commit).
+        and_return(commit)
+
       allow(project.repository).to receive(:commits_between).and_return([commit])
     end
 
@@ -381,6 +345,9 @@ describe GitPushService, services: true do
         committed_date: commit_time
       )
 
+      allow_any_instance_of(ProcessCommitWorker).to receive(:find_commit).
+        and_return(commit)
+
       allow(project.repository).to receive(:commits_between).and_return([commit])
     end
 
@@ -416,6 +383,9 @@ describe GitPushService, services: true do
 
       allow(project.repository).to receive(:commits_between).
         and_return([closing_commit])
+
+      allow_any_instance_of(ProcessCommitWorker).to receive(:find_commit).
+        and_return(closing_commit)
 
       project.team << [commit_author, :master]
     end
@@ -475,11 +445,7 @@ describe GitPushService, services: true do
         # project.create_jira_service doesn't seem to invalidate the cache here
         project.has_external_issue_tracker = true
         jira_service_settings
-
-        WebMock.stub_request(:post, jira_api_transition_url)
-        WebMock.stub_request(:post, jira_api_comment_url)
-        WebMock.stub_request(:get, jira_api_comment_url).to_return(body: jira_issue_comments)
-        WebMock.stub_request(:get, jira_api_test_url)
+        stub_jira_urls("JIRA-1")
 
         allow(closing_commit).to receive_messages({
           issue_closing_regex: Regexp.new(Gitlab.config.gitlab.issue_closing_pattern),
@@ -499,9 +465,9 @@ describe GitPushService, services: true do
         let(:message) { "this is some work.\n\nrelated to JIRA-1" }
 
         it "initiates one api call to jira server to mention the issue" do
-          execute_service(project, user, @oldrev, @newrev, @ref )
+          execute_service(project, user, @oldrev, @newrev, @ref)
 
-          expect(WebMock).to have_requested(:post, jira_api_comment_url).with(
+          expect(WebMock).to have_requested(:post, jira_api_comment_url('JIRA-1')).with(
             body: /mentioned this issue in/
           ).once
         end
@@ -509,22 +475,29 @@ describe GitPushService, services: true do
 
       context "closing an issue" do
         let(:message)         { "this is some work.\n\ncloses JIRA-1" }
-        let(:transition_body) { { transition: { id: '2' } }.to_json }
-        let(:comment_body)    { { body: "Issue solved with [#{closing_commit.id}|http://localhost/#{project.path_with_namespace}/commit/#{closing_commit.id}]." }.to_json }
+        let(:comment_body)    { { body: "Issue solved with [#{closing_commit.id}|http://#{Gitlab.config.gitlab.host}/#{project.path_with_namespace}/commit/#{closing_commit.id}]." }.to_json }
+
+        before do
+          open_issue   = JIRA::Resource::Issue.new(jira_tracker.client, attrs: { "id" => "JIRA-1" })
+          closed_issue = open_issue.dup
+          allow(open_issue).to receive(:resolution).and_return(false)
+          allow(closed_issue).to receive(:resolution).and_return(true)
+          allow(JIRA::Resource::Issue).to receive(:find).and_return(open_issue, closed_issue)
+
+          allow_any_instance_of(JIRA::Resource::Issue).to receive(:key).and_return("JIRA-1")
+        end
 
         context "using right markdown" do
           it "initiates one api call to jira server to close the issue" do
             execute_service(project, commit_author, @oldrev, @newrev, @ref )
 
-            expect(WebMock).to have_requested(:post, jira_api_transition_url).with(
-              body: transition_body
-            ).once
+            expect(WebMock).to have_requested(:post, jira_api_transition_url('JIRA-1')).once
           end
 
           it "initiates one api call to jira server to comment on the issue" do
             execute_service(project, commit_author, @oldrev, @newrev, @ref )
 
-            expect(WebMock).to have_requested(:post, jira_api_comment_url).with(
+            expect(WebMock).to have_requested(:post, jira_api_comment_url('JIRA-1')).with(
               body: comment_body
             ).once
           end
@@ -536,15 +509,13 @@ describe GitPushService, services: true do
           it "does not initiates one api call to jira server to close the issue" do
             execute_service(project, commit_author, @oldrev, @newrev, @ref )
 
-            expect(WebMock).not_to have_requested(:post, jira_api_transition_url).with(
-              body: transition_body
-            )
+            expect(WebMock).not_to have_requested(:post, jira_api_transition_url('JIRA-1'))
           end
 
           it "does not initiates one api call to jira server to comment on the issue" do
             execute_service(project, commit_author, @oldrev, @newrev, @ref )
 
-            expect(WebMock).not_to have_requested(:post, jira_api_comment_url).with(
+            expect(WebMock).not_to have_requested(:post, jira_api_comment_url('JIRA-1')).with(
               body: comment_body
             ).once
           end
@@ -571,7 +542,14 @@ describe GitPushService, services: true do
     let(:housekeeping) { Projects::HousekeepingService.new(project) }
 
     before do
+      # Flush any raw Redis data stored by the housekeeping code.
+      Gitlab::Redis.with { |conn| conn.flushall }
+
       allow(Projects::HousekeepingService).to receive(:new).and_return(housekeeping)
+    end
+
+    after do
+      Gitlab::Redis.with { |conn| conn.flushall }
     end
 
     it 'does not perform housekeeping when not needed' do
@@ -602,6 +580,51 @@ describe GitPushService, services: true do
       expect(housekeeping).to receive(:increment!)
 
       execute_service(project, user, @oldrev, @newrev, @ref)
+    end
+  end
+
+  describe '#update_caches' do
+    let(:service) do
+      described_class.new(project,
+                          user,
+                          oldrev: sample_commit.parent_id,
+                          newrev: sample_commit.id,
+                          ref: 'refs/heads/master')
+    end
+
+    context 'on the default branch' do
+      before do
+        allow(service).to receive(:is_default_branch?).and_return(true)
+      end
+
+      it 'flushes the caches of any special files that have been changed' do
+        commit = double(:commit)
+        diff = double(:diff, new_path: 'README.md')
+
+        expect(commit).to receive(:raw_diffs).with(deltas_only: true).
+          and_return([diff])
+
+        service.push_commits = [commit]
+
+        expect(ProjectCacheWorker).to receive(:perform_async).
+          with(project.id, %i(readme))
+
+        service.update_caches
+      end
+    end
+
+    context 'on a non-default branch' do
+      before do
+        allow(service).to receive(:is_default_branch?).and_return(false)
+      end
+
+      it 'does not flush any conditional caches' do
+        expect(ProjectCacheWorker).to receive(:perform_async).
+          with(project.id, []).
+          and_call_original
+
+        service.update_caches
+      end
     end
   end
 

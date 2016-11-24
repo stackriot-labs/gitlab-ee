@@ -1,3 +1,4 @@
+/* eslint-disable */
 // Creates the variables for setting up GFM auto-completion
 (function() {
   if (window.GitLab == null) {
@@ -15,7 +16,7 @@
     },
     // Team Members
     Members: {
-      template: '<li>${username} <small>${title}</small></li>'
+      template: '<li>${avatarTag} ${username} <small>${title}</small></li>'
     },
     Labels: {
       template: '<li><span class="dropdown-label-box" style="background: ${color}"></span> ${title}</li>'
@@ -33,6 +34,8 @@
     },
     DefaultOptions: {
       sorter: function(query, items, searchKey) {
+        // Highlight first item only if at least one char was typed
+        this.setting.highlightFirst = this.setting.alwaysHighlightFirst || query.length > 0;
         if ((items[0].name != null) && items[0].name === 'loading') {
           return items;
         }
@@ -109,13 +112,14 @@
         insertTpl: '${atwho-at}${username}',
         searchKey: 'search',
         data: ['loading'],
+        alwaysHighlightFirst: true,
         callbacks: {
           sorter: this.DefaultOptions.sorter,
           filter: this.DefaultOptions.filter,
           beforeInsert: this.DefaultOptions.beforeInsert,
           beforeSave: function(members) {
             return $.map(members, function(m) {
-              var title;
+              let title = '';
               if (m.username == null) {
                 return m;
               }
@@ -123,10 +127,16 @@
               if (m.count) {
                 title += " (" + m.count + ")";
               }
+
+              const autoCompleteAvatar = m.avatar_url || m.username.charAt(0).toUpperCase();
+              const imgAvatar = `<img src="${m.avatar_url}" alt="${m.username}" class="avatar avatar-inline center s26"/>`;
+              const txtAvatar = `<div class="avatar center avatar-inline s26">${autoCompleteAvatar}</div>`;
+
               return {
                 username: m.username,
-                title: sanitize(title),
-                search: sanitize(m.username + " " + m.name)
+                avatarTag: autoCompleteAvatar.length === 1 ?  txtAvatar : imgAvatar,
+                title: gl.utils.sanitize(title),
+                search: gl.utils.sanitize(m.username + " " + m.name)
               };
             });
           }
@@ -158,7 +168,7 @@
               }
               return {
                 id: i.iid,
-                title: sanitize(i.title),
+                title: gl.utils.sanitize(i.title),
                 search: i.iid + " " + i.title
               };
             });
@@ -181,6 +191,7 @@
         insertTpl: '${atwho-at}"${title}"',
         data: ['loading'],
         callbacks: {
+          sorter: this.DefaultOptions.sorter,
           beforeSave: function(milestones) {
             return $.map(milestones, function(m) {
               if (m.title == null) {
@@ -188,7 +199,7 @@
               }
               return {
                 id: m.iid,
-                title: sanitize(m.title),
+                title: gl.utils.sanitize(m.title),
                 search: "" + m.title
               };
             });
@@ -221,7 +232,7 @@
               }
               return {
                 id: m.iid,
-                title: sanitize(m.title),
+                title: gl.utils.sanitize(m.title),
                 search: m.iid + " " + m.title
               };
             });
@@ -235,13 +246,14 @@
         displayTpl: this.Labels.template,
         insertTpl: '${atwho-at}${title}',
         callbacks: {
+          sorter: this.DefaultOptions.sorter,
           beforeSave: function(merges) {
             var sanitizeLabelTitle;
             sanitizeLabelTitle = function(title) {
               if (/[\w\?&]+\s+[\w\?&]+/g.test(title)) {
-                return "\"" + (sanitize(title)) + "\"";
+                return "\"" + (gl.utils.sanitize(title)) + "\"";
               } else {
-                return sanitize(title);
+                return gl.utils.sanitize(title);
               }
             };
             return $.map(merges, function(m) {

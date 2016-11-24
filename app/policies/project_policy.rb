@@ -2,11 +2,11 @@ class ProjectPolicy < BasePolicy
   def rules
     team_access!(user)
 
-    owner = user.admin? ||
-            project.owner == user ||
+    owner = project.owner == user ||
             (project.group && project.group.has_owner?(user))
 
-    owner_access! if owner
+    owner_access! if user.admin? || owner
+    team_member_owner_access! if owner
 
     if project.public? || (project.internal? && !user.external?)
       guest_access!
@@ -16,7 +16,7 @@ class ProjectPolicy < BasePolicy
       can! :read_build if project.public_builds?
 
       if project.request_access_enabled &&
-         !(owner || project.team.member?(user) || project_group_member?(user))
+         !(owner || user.admin? || project.team.member?(user) || project_group_member?(user))
         can! :request_access
       end
     end
@@ -149,6 +149,10 @@ class ProjectPolicy < BasePolicy
     can! :remove_pages
   end
 
+  def team_member_owner_access!
+    team_member_reporter_access!
+  end
+
   # Push abilities on the users team role
   def team_access!(user)
     access = project.team.max_member_access(user.id)
@@ -217,14 +221,6 @@ class ProjectPolicy < BasePolicy
     unless project.container_registry_enabled
       cannot!(*named_abilities(:container_image))
     end
-
-    # EE-only
-    if defined?(License) && License.block_changes?
-      cannot! :create_issue
-      cannot! :create_merge_request
-      cannot! :push_code
-      cannot! :push_code_to_protected_branches
-    end
   end
 
   def anonymous_rules
@@ -271,4 +267,19 @@ class ProjectPolicy < BasePolicy
       :"admin_#{name}"
     ]
   end
+
+  # EE-specific
+  module EeDisabledFeaturePermissions
+    def disabled_features!
+      super
+
+      if License.block_changes?
+        cannot! :create_issue
+        cannot! :create_merge_request
+        cannot! :push_code
+        cannot! :push_code_to_protected_branches
+      end
+    end
+  end
+  prepend EeDisabledFeaturePermissions
 end

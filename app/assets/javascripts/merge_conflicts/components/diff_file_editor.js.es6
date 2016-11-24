@@ -1,3 +1,4 @@
+/* eslint-disable */
 ((global) => {
 
   global.mergeConflicts = global.mergeConflicts || {};
@@ -35,7 +36,7 @@
         this.loadEditor();
       }
     },
-    ready() {
+    mounted() {
       if (this.file.loadEditor) {
         this.loadEditor();
       }

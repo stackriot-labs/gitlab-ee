@@ -4,12 +4,18 @@ class Spinach::Features::ProjectIssuesWeight < Spinach::FeatureSteps
   include SharedPaths
 
   step 'I click link "New Issue"' do
-    click_link "New Issue"
+    click_link "New issue"
   end
 
   step 'I submit new issue "500 error on profile" with weight' do
     fill_in "issue_title", with: "500 error on profile"
-    select "7", from: "issue_weight"
+
+    click_button 'Weight'
+
+    page.within '.dropdown-menu-weight' do
+      click_link '7'
+    end
+
     click_button "Submit issue"
   end
 

@@ -53,7 +53,7 @@ describe 'Issue Boards', feature: true, js: true do
   context 'with lists' do
     let(:milestone) { create(:milestone, project: project) }
 
-    let(:planning)    { create(:label, project: project, name: 'Planning') }
+    let(:planning)    { create(:label, project: project, name: 'Planning', description: 'Test') }
     let(:development) { create(:label, project: project, name: 'Development') }
     let(:testing)     { create(:label, project: project, name: 'Testing') }
     let(:bug)         { create(:label, project: project, name: 'Bug') }
@@ -89,6 +89,12 @@ describe 'Issue Boards', feature: true, js: true do
 
     it 'shows lists' do
       expect(page).to have_selector('.board', count: 4)
+    end
+
+    it 'shows description tooltip on list title' do
+      page.within('.board:nth-child(2)') do
+        expect(find('.board-title span.has-tooltip')[:title]).to eq('Test')
+      end
     end
 
     it 'shows issues in lists' do
@@ -347,6 +353,19 @@ describe 'Issue Boards', feature: true, js: true do
           expect(page).to have_selector('.board', count: 5)
         end
 
+        it 'keeps dropdown open after adding new list' do
+          click_button 'Create new list'
+          wait_for_ajax
+
+          page.within('.dropdown-menu-issues-board-new') do
+            click_link done.title
+          end
+
+          wait_for_vue_resource
+
+          expect(find('.issue-boards-search')).to have_selector('.open')
+        end
+
         it 'moves issues from backlog into new list' do
           wait_for_board_cards(1, 6)
 
@@ -360,6 +379,25 @@ describe 'Issue Boards', feature: true, js: true do
           wait_for_vue_resource
 
           wait_for_board_cards(1, 5)
+        end
+
+        it 'creates new list from a new label' do
+          click_button 'Create new list'
+
+          wait_for_ajax
+
+          click_link 'Create new label'
+
+          fill_in('new_label_name', with: 'Testing New Label')
+
+          first('.suggest-colors a').click
+
+          click_button 'Create'
+
+          wait_for_ajax
+          wait_for_vue_resource
+
+          expect(page).to have_selector('.board', count: 5)
         end
       end
     end
@@ -621,8 +659,16 @@ describe 'Issue Boards', feature: true, js: true do
       wait_for_vue_resource
     end
 
+    it 'displays lists' do
+      expect(page).to have_selector('.board')
+    end
+
     it 'does not show create new list' do
       expect(page).not_to have_selector('.js-new-board-list')
+    end
+
+    it 'does not allow dragging' do
+      expect(page).not_to have_selector('.user-can-drag')
     end
   end
 

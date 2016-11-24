@@ -3,13 +3,12 @@ class MergeRequest < ActiveRecord::Base
   include Issuable
   include Referable
   include Sortable
-  include Taskable
   include Elastic::MergeRequestsSearch
   include Importable
   include Approvable
 
-  belongs_to :target_project, foreign_key: :target_project_id, class_name: "Project"
-  belongs_to :source_project, foreign_key: :source_project_id, class_name: "Project"
+  belongs_to :target_project, class_name: "Project"
+  belongs_to :source_project, class_name: "Project"
   belongs_to :merge_user, class_name: "User"
 
   has_many :approvals, dependent: :destroy
@@ -449,6 +448,7 @@ class MergeRequest < ActiveRecord::Base
     return false if work_in_progress?
     return false if broken?
     return false unless skip_ci_check || mergeable_ci_state?
+    return false unless mergeable_discussions_state?
 
     true
   end
@@ -465,11 +465,11 @@ class MergeRequest < ActiveRecord::Base
   end
 
   def should_remove_source_branch?
-    merge_params['should_remove_source_branch'].present?
+    Gitlab::Utils.to_boolean(merge_params['should_remove_source_branch'])
   end
 
   def force_remove_source_branch?
-    merge_params['force_remove_source_branch'].present?
+    Gitlab::Utils.to_boolean(merge_params['force_remove_source_branch'])
   end
 
   def remove_source_branch?
@@ -515,6 +515,12 @@ class MergeRequest < ActiveRecord::Base
 
   def discussions_resolved?
     discussions_resolvable? && diff_discussions.none?(&:to_be_resolved?)
+  end
+
+  def mergeable_discussions_state?
+    return true unless project.only_allow_merge_if_all_discussions_are_resolved?
+
+    discussions_resolved?
   end
 
   def hook_attrs
@@ -703,18 +709,21 @@ class MergeRequest < ActiveRecord::Base
   def mergeable_ci_state?
     return true unless project.only_allow_merge_if_build_succeeds?
 
-    !pipeline || pipeline.success?
+    !pipeline || pipeline.success? || pipeline.skipped?
   end
 
   def environments
     return [] unless diff_head_commit
 
-    @environments ||=
-      begin
-        envs = target_project.environments_for(target_branch, diff_head_commit, with_tags: true)
-        envs.concat(source_project.environments_for(source_branch, diff_head_commit)) if source_project
-        envs.uniq
-      end
+    @environments ||= begin
+      target_envs = target_project.environments_for(
+        target_branch, commit: diff_head_commit, with_tags: true)
+
+      source_envs = source_project.environments_for(
+        source_branch, commit: diff_head_commit) if source_project
+
+      (target_envs.to_a + source_envs.to_a).uniq
+    end
   end
 
   def state_human_name
@@ -779,7 +788,19 @@ class MergeRequest < ActiveRecord::Base
   end
 
   def rebase_in_progress?
-    File.exist?(rebase_dir_path)
+    # The source project can be deleted
+    return false unless source_project
+
+    File.exist?(rebase_dir_path) && !clean_stuck_rebase
+  end
+
+  def clean_stuck_rebase
+    expiration_time = Time.now - 15.minutes
+
+    if File.new(rebase_dir_path).mtime < expiration_time
+      FileUtils.rm_rf(rebase_dir_path)
+      true
+    end
   end
 
   def diverged_commits_count

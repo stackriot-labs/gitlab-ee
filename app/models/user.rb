@@ -13,6 +13,7 @@ class User < ActiveRecord::Base
   DEFAULT_NOTIFICATION_LEVEL = :participating
 
   add_authentication_token_field :authentication_token
+  add_authentication_token_field :incoming_email_token
 
   default_value_for :admin, false
   default_value_for(:external) { current_application_settings.user_default_external }
@@ -47,7 +48,7 @@ class User < ActiveRecord::Base
   #
 
   # Namespace for personal projects
-  has_one :namespace, -> { where type: nil }, dependent: :destroy, foreign_key: :owner_id, class_name: "Namespace"
+  has_one :namespace, -> { where type: nil }, dependent: :destroy, foreign_key: :owner_id
 
   # Profile
   has_many :keys, dependent: :destroy
@@ -55,6 +56,7 @@ class User < ActiveRecord::Base
   has_many :personal_access_tokens, dependent: :destroy
   has_many :identities, dependent: :destroy, autosave: true
   has_many :u2f_registrations, dependent: :destroy
+  has_many :chat_names, dependent: :destroy
 
   # Groups
   has_many :members, dependent: :destroy
@@ -66,17 +68,19 @@ class User < ActiveRecord::Base
   # Projects
   has_many :groups_projects,          through: :groups, source: :projects
   has_many :personal_projects,        through: :namespace, source: :projects
-  has_many :project_members, -> { where(requested_at: nil) }, dependent: :destroy, class_name: 'ProjectMember'
+  has_many :project_members, -> { where(requested_at: nil) }, dependent: :destroy
   has_many :projects,                 through: :project_members
   has_many :created_projects,         foreign_key: :creator_id, class_name: 'Project'
-  has_many :users_star_projects,      dependent: :destroy
-  has_many :starred_projects,         through: :users_star_projects, source: :project
+  has_many :users_star_projects, dependent: :destroy
+  has_many :starred_projects, through: :users_star_projects, source: :project
+  has_many :project_authorizations, dependent: :destroy
+  has_many :authorized_projects, through: :project_authorizations, source: :project
 
-  has_many :snippets,                 dependent: :destroy, foreign_key: :author_id, class_name: "Snippet"
+  has_many :snippets,                 dependent: :destroy, foreign_key: :author_id
   has_many :issues,                   dependent: :destroy, foreign_key: :author_id
   has_many :notes,                    dependent: :destroy, foreign_key: :author_id
   has_many :merge_requests,           dependent: :destroy, foreign_key: :author_id
-  has_many :events,                   dependent: :destroy, foreign_key: :author_id,   class_name: "Event"
+  has_many :events,                   dependent: :destroy, foreign_key: :author_id
   has_many :subscriptions,            dependent: :destroy
   has_many :recent_events, -> { order "id DESC" }, foreign_key: :author_id,   class_name: "Event"
   has_many :assigned_issues,          dependent: :destroy, foreign_key: :assignee_id, class_name: "Issue"
@@ -101,8 +105,10 @@ class User < ActiveRecord::Base
   #
   # Validations
   #
+  # Note: devise :validatable above adds validations for :email and :password
   validates :name, presence: true
-  validates :notification_email, presence: true, email: true
+  validates :notification_email, presence: true
+  validates :notification_email, email: true, if: ->(user) { user.notification_email != user.email }
   validates :public_email, presence: true, uniqueness: true, email: true, allow_blank: true
   validates :bio, length: { maximum: 255 }, allow_blank: true
   validates :projects_limit, presence: true, numericality: { greater_than_or_equal_to: 0 }
@@ -125,7 +131,7 @@ class User < ActiveRecord::Base
   before_validation :set_public_email, if: ->(user) { user.public_email_changed? }
 
   after_update :update_emails_with_primary_email, if: ->(user) { user.email_changed? }
-  before_save :ensure_authentication_token
+  before_save :ensure_authentication_token, :ensure_incoming_email_token
   before_save :ensure_external_user_rights
   after_save :ensure_namespace_correct
   after_initialize :set_projects_limit
@@ -179,12 +185,13 @@ class User < ActiveRecord::Base
   scope :external, -> { where(external: true) }
   scope :active, -> { with_state(:active) }
   scope :not_in_project, ->(project) { project.users.present? ? where("id not in (:ids)", ids: project.users.map(&:id) ) : all }
-  scope :without_projects, -> { where('id NOT IN (SELECT DISTINCT(user_id) FROM members)') }
+  scope :without_projects, -> { where('id NOT IN (SELECT DISTINCT(user_id) FROM members WHERE user_id IS NOT NULL AND requested_at IS NULL)') }
   scope :subscribed_for_admin_email, -> { where(admin_email_unsubscribed_at: nil) }
   scope :ldap, -> { joins(:identities).where('identities.provider LIKE ?', 'ldap%') }
   scope :with_provider, ->(provider) do
     joins(:identities).where(identities: { provider: provider })
   end
+  scope :todo_authors, ->(user_id, state) { where(id: Todo.where(user_id: user_id, state: state).select(:author_id)) }
 
   def self.with_two_factor
     joins("LEFT OUTER JOIN u2f_registrations AS u2f ON u2f.user_id = users.id").
@@ -240,19 +247,19 @@ class User < ActiveRecord::Base
     def filter(filter_name)
       case filter_name
       when 'admins'
-        self.admins
+        admins
       when 'blocked'
-        self.blocked
+        blocked
       when 'two_factor_disabled'
-        self.without_two_factor
+        without_two_factor
       when 'two_factor_enabled'
-        self.with_two_factor
+        with_two_factor
       when 'wop'
-        self.without_projects
+        without_projects
       when 'external'
-        self.external
+        external
       else
-        self.active
+        active
       end
     end
 
@@ -271,6 +278,24 @@ class User < ActiveRecord::Base
         table[:name].matches(pattern).
           or(table[:email].matches(pattern)).
           or(table[:username].matches(pattern))
+      )
+    end
+
+    # searches user by given pattern
+    # it compares name, email, username fields and user's secondary emails with given pattern
+    # This method uses ILIKE on PostgreSQL and LIKE on MySQL.
+
+    def search_with_secondary_emails(query)
+      table = arel_table
+      email_table = Email.arel_table
+      pattern = "%#{query}%"
+      matched_by_emails_user_ids = email_table.project(email_table[:user_id]).where(email_table[:email].matches(pattern))
+
+      where(
+        table[:name].matches(pattern).
+          or(table[:email].matches(pattern)).
+          or(table[:username].matches(pattern)).
+          or(table[:id].in(matched_by_emails_user_ids))
       )
     end
 
@@ -348,12 +373,12 @@ class User < ActiveRecord::Base
     username
   end
 
-  def to_reference(_from_project = nil)
+  def to_reference(_from_project = nil, _target_project = nil)
     "#{self.class.reference_prefix}#{username}"
   end
 
   def generate_password
-    if self.force_random_password
+    if force_random_password
       self.password = self.password_confirmation = Devise.friendly_token.first(Devise.password_length.min)
     end
   end
@@ -394,56 +419,55 @@ class User < ActiveRecord::Base
   end
 
   def two_factor_otp_enabled?
-    self.otp_required_for_login?
+    otp_required_for_login?
   end
 
   def two_factor_u2f_enabled?
-    self.u2f_registrations.exists?
+    u2f_registrations.exists?
   end
 
   def namespace_uniq
     # Return early if username already failed the first uniqueness validation
-    return if self.errors.key?(:username) &&
-      self.errors[:username].include?('has already been taken')
+    return if errors.key?(:username) &&
+      errors[:username].include?('has already been taken')
 
-    namespace_name = self.username
-    existing_namespace = Namespace.by_path(namespace_name)
-    if existing_namespace && existing_namespace != self.namespace
-      self.errors.add(:username, 'has already been taken')
+    existing_namespace = Namespace.by_path(username)
+    if existing_namespace && existing_namespace != namespace
+      errors.add(:username, 'has already been taken')
     end
   end
 
   def avatar_type
-    unless self.avatar.image?
-      self.errors.add :avatar, "only images allowed"
+    unless avatar.image?
+      errors.add :avatar, "only images allowed"
     end
   end
 
   def unique_email
-    if !self.emails.exists?(email: self.email) && Email.exists?(email: self.email)
-      self.errors.add(:email, 'has already been taken')
+    if !emails.exists?(email: email) && Email.exists?(email: email)
+      errors.add(:email, 'has already been taken')
     end
   end
 
   def owns_notification_email
-    return if self.temp_oauth_email?
+    return if temp_oauth_email?
 
-    self.errors.add(:notification_email, "is not an email you own") unless self.all_emails.include?(self.notification_email)
+    errors.add(:notification_email, "is not an email you own") unless all_emails.include?(notification_email)
   end
 
   def owns_public_email
-    return if self.public_email.blank?
+    return if public_email.blank?
 
-    self.errors.add(:public_email, "is not an email you own") unless self.all_emails.include?(self.public_email)
+    errors.add(:public_email, "is not an email you own") unless all_emails.include?(public_email)
   end
 
   def update_emails_with_primary_email
-    primary_email_record = self.emails.find_by(email: self.email)
+    primary_email_record = emails.find_by(email: email)
     if primary_email_record
       primary_email_record.destroy
-      self.emails.create(email: self.email_was)
+      emails.create(email: email_was)
 
-      self.update_secondary_emails!
+      update_secondary_emails!
     end
   end
 
@@ -455,16 +479,60 @@ class User < ActiveRecord::Base
     Group.where("namespaces.id IN (#{union.to_sql})")
   end
 
-  # Returns projects user is authorized to access.
-  #
-  # If you change the logic of this method, please also update `Project#authorized_for_user`
+  def refresh_authorized_projects
+    loop do
+      begin
+        Gitlab::Database.serialized_transaction do
+          project_authorizations.delete_all
+
+          # project_authorizations_union can return multiple records for the same project/user with
+          # different access_level so we take row with the maximum access_level
+          project_authorizations.connection.execute <<-SQL
+            INSERT INTO project_authorizations (user_id, project_id, access_level)
+            SELECT user_id, project_id, MAX(access_level) AS access_level
+            FROM (#{project_authorizations_union.to_sql}) sub
+            GROUP BY user_id, project_id
+          SQL
+
+          update_column(:authorized_projects_populated, true) unless authorized_projects_populated
+        end
+
+        break
+      # In the event of a concurrent modification Rails raises StatementInvalid.
+      # In this case we want to keep retrying until the transaction succeeds
+      rescue ActiveRecord::StatementInvalid
+      end
+    end
+  end
+
   def authorized_projects(min_access_level = nil)
-    Project.where("projects.id IN (#{projects_union(min_access_level).to_sql})")
+    refresh_authorized_projects unless authorized_projects_populated
+
+    # We're overriding an association, so explicitly call super with no arguments or it would be passed as `force_reload` to the association
+    projects = super()
+    projects = projects.where('project_authorizations.access_level >= ?', min_access_level) if min_access_level
+
+    projects
+  end
+
+  def authorized_project?(project, min_access_level = nil)
+    authorized_projects(min_access_level).exists?({ id: project.id })
+  end
+
+  # Returns the projects this user has reporter (or greater) access to, limited
+  # to at most the given projects.
+  #
+  # This method is useful when you have a list of projects and want to
+  # efficiently check to which of these projects the user has at least reporter
+  # access.
+  def projects_with_reporter_access_limited_to(projects)
+    authorized_projects(Gitlab::Access::REPORTER).where(id: projects)
   end
 
   def viewable_starred_projects
-    starred_projects.where("projects.visibility_level IN (?) OR projects.id IN (#{projects_union.to_sql})",
-                           [Project::PUBLIC, Project::INTERNAL])
+    starred_projects.where("projects.visibility_level IN (?) OR projects.id IN (?)",
+                           [Project::PUBLIC, Project::INTERNAL],
+                           authorized_projects.select(:project_id))
   end
 
   def owned_projects
@@ -587,7 +655,7 @@ class User < ActiveRecord::Base
   end
 
   def project_deploy_keys
-    DeployKey.unscoped.in_projects(self.authorized_projects.pluck(:id)).distinct(:id)
+    DeployKey.unscoped.in_projects(authorized_projects.pluck(:id)).distinct(:id)
   end
 
   def accessible_deploy_keys
@@ -603,38 +671,38 @@ class User < ActiveRecord::Base
   end
 
   def sanitize_attrs
-    %w(name username skype linkedin twitter).each do |attr|
-      value = self.send(attr)
-      self.send("#{attr}=", Sanitize.clean(value)) if value.present?
+    %w[name username skype linkedin twitter].each do |attr|
+      value = public_send(attr)
+      public_send("#{attr}=", Sanitize.clean(value)) if value.present?
     end
   end
 
   def set_notification_email
-    if self.notification_email.blank? || !self.all_emails.include?(self.notification_email)
-      self.notification_email = self.email
+    if notification_email.blank? || !all_emails.include?(notification_email)
+      self.notification_email = email
     end
   end
 
   def set_public_email
-    if self.public_email.blank? || !self.all_emails.include?(self.public_email)
+    if public_email.blank? || !all_emails.include?(public_email)
       self.public_email = ''
     end
   end
 
   def update_secondary_emails!
-    self.set_notification_email
-    self.set_public_email
-    self.save if self.notification_email_changed? || self.public_email_changed?
+    set_notification_email
+    set_public_email
+    save if notification_email_changed? || public_email_changed?
   end
 
   def set_projects_limit
     # `User.select(:id)` raises
     # `ActiveModel::MissingAttributeError: missing attribute: projects_limit`
     # without this safeguard!
-    return unless self.has_attribute?(:projects_limit)
+    return unless has_attribute?(:projects_limit)
 
     connection_default_value_defined = new_record? && !projects_limit_changed?
-    return unless self.projects_limit.nil? || connection_default_value_defined
+    return unless projects_limit.nil? || connection_default_value_defined
 
     self.projects_limit = current_application_settings.default_projects_limit
   end
@@ -664,7 +732,7 @@ class User < ActiveRecord::Base
 
   def with_defaults
     User.defaults.each do |k, v|
-      self.send("#{k}=", v)
+      public_send("#{k}=", v)
     end
 
     self
@@ -684,7 +752,7 @@ class User < ActiveRecord::Base
   # Thus it will automatically generate a new fragment
   # when the event is updated because the key changes.
   def reset_events_cache
-    Event.where(author_id: self.id).
+    Event.where(author_id: id).
       order('id DESC').limit(1000).
       update_all(updated_at: Time.now)
   end
@@ -717,8 +785,8 @@ class User < ActiveRecord::Base
 
   def all_emails
     all_emails = []
-    all_emails << self.email unless self.temp_oauth_email?
-    all_emails.concat(self.emails.map(&:email))
+    all_emails << email unless temp_oauth_email?
+    all_emails.concat(emails.map(&:email))
     all_emails
   end
 
@@ -732,21 +800,21 @@ class User < ActiveRecord::Base
 
   def ensure_namespace_correct
     # Ensure user has namespace
-    self.create_namespace!(path: self.username, name: self.username) unless self.namespace
+    create_namespace!(path: username, name: username) unless namespace
 
-    if self.username_changed?
-      self.namespace.update_attributes(path: self.username, name: self.username)
+    if username_changed?
+      namespace.update_attributes(path: username, name: username)
     end
   end
 
   def post_create_hook
-    log_info("User \"#{self.name}\" (#{self.email}) was created")
-    notification_service.new_user(self, @reset_token) if self.created_by_id
+    log_info("User \"#{name}\" (#{email}) was created")
+    notification_service.new_user(self, @reset_token) if created_by_id
     system_hook_service.execute_hooks_for(self, :create)
   end
 
   def post_destroy_hook
-    log_info("User \"#{self.name}\" (#{self.email})  was removed")
+    log_info("User \"#{name}\" (#{email})  was removed")
     system_hook_service.execute_hooks_for(self, :destroy)
   end
 
@@ -794,7 +862,7 @@ class User < ActiveRecord::Base
   end
 
   def oauth_authorized_tokens
-    Doorkeeper::AccessToken.where(resource_owner_id: self.id, revoked_at: nil)
+    Doorkeeper::AccessToken.where(resource_owner_id: id, revoked_at: nil)
   end
 
   # Returns the projects a user contributed to in the last year.
@@ -898,16 +966,14 @@ class User < ActiveRecord::Base
 
   private
 
-  def projects_union(min_access_level = nil)
-    relations = [personal_projects.select(:id),
-                 groups_projects.select(:id),
-                 projects.select(:id),
-                 groups.joins(:shared_projects).select(:project_id)]
-
-    if min_access_level
-      scope = { access_level: Gitlab::Access.all_values.select { |access| access >= min_access_level } }
-      relations = [relations.shift] + relations.map { |relation| relation.where(members: scope) }
-    end
+  # Returns a union query of projects that the user is authorized to access
+  def project_authorizations_union
+    relations = [
+      personal_projects.select("#{id} AS user_id, projects.id AS project_id, #{Gitlab::Access::OWNER} AS access_level"),
+      groups_projects.select_for_project_authorization,
+      projects.select_for_project_authorization,
+      groups.joins(:shared_projects).select_for_project_authorization
+    ]
 
     Gitlab::SQL::Union.new(relations)
   end
@@ -927,7 +993,7 @@ class User < ActiveRecord::Base
   end
 
   def ensure_external_user_rights
-    return unless self.external?
+    return unless external?
 
     self.can_create_group   = false
     self.projects_limit     = 0
@@ -939,7 +1005,7 @@ class User < ActiveRecord::Base
 
     if current_application_settings.domain_blacklist_enabled?
       blocked_domains = current_application_settings.domain_blacklist
-      if domain_matches?(blocked_domains, self.email)
+      if domain_matches?(blocked_domains, email)
         error = 'is not from an allowed domain.'
         valid = false
       end
@@ -947,7 +1013,7 @@ class User < ActiveRecord::Base
 
     allowed_domains = current_application_settings.domain_whitelist
     unless allowed_domains.blank?
-      if domain_matches?(allowed_domains, self.email)
+      if domain_matches?(allowed_domains, email)
         valid = true
       else
         error = "domain is not authorized for sign-up"
@@ -955,7 +1021,7 @@ class User < ActiveRecord::Base
       end
     end
 
-    self.errors.add(:email, error) unless valid
+    errors.add(:email, error) unless valid
 
     valid
   end
@@ -966,6 +1032,15 @@ class User < ActiveRecord::Base
       escaped = Regexp.escape(domain).gsub('\*', '.*?')
       regexp = Regexp.new "^#{escaped}$", Regexp::IGNORECASE
       signup_domain =~ regexp
+    end
+  end
+
+  def generate_token(token_field)
+    if token_field == :incoming_email_token
+      # Needs to be all lowercase and alphanumeric because it's gonna be used in an email address.
+      SecureRandom.hex.to_i(16).to_s(36)
+    else
+      super
     end
   end
 end

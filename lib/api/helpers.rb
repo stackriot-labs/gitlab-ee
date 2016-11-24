@@ -1,16 +1,11 @@
 module API
   module Helpers
+    include Gitlab::Utils
+
     PRIVATE_TOKEN_HEADER = "HTTP_PRIVATE_TOKEN"
     PRIVATE_TOKEN_PARAM = :private_token
     SUDO_HEADER = "HTTP_SUDO"
     SUDO_PARAM = :sudo
-
-    def to_boolean(value)
-      return true if value =~ /^(true|t|yes|y|1|on)$/i
-      return false if value =~ /^(false|f|no|n|0|off)$/i
-
-      nil
-    end
 
     def private_token
       params[PRIVATE_TOKEN_PARAM] || env[PRIVATE_TOKEN_HEADER]
@@ -26,6 +21,11 @@ module API
     # state-changing endpoints
     def find_user_from_warden
       warden.try(:authenticate) if %w[GET HEAD].include?(env['REQUEST_METHOD'])
+    end
+
+    def declared_params(options = {})
+      options = { include_parent_namespaces: false }.merge(options)
+      declared(params, options).to_h.symbolize_keys
     end
 
     def find_user_by_private_token
@@ -85,24 +85,9 @@ module API
       end
     end
 
-    def project_service
-      @project_service ||= begin
-        underscored_service = params[:service_slug].underscore
-
-        if Service.available_services_names.include?(underscored_service)
-          user_project.build_missing_services
-
-          service_method = "#{underscored_service}_service"
-
-          send_service(service_method)
-        end
-      end
-
+    def project_service(project = user_project)
+      @project_service ||= project.find_or_initialize_service(params[:service_slug].underscore)
       @project_service || not_found!("Service")
-    end
-
-    def send_service(service_method)
-      user_project.send(service_method)
     end
 
     def service_attributes

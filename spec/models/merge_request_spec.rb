@@ -6,8 +6,8 @@ describe MergeRequest, models: true do
   subject { create(:merge_request) }
 
   describe 'associations' do
-    it { is_expected.to belong_to(:target_project).with_foreign_key(:target_project_id).class_name('Project') }
-    it { is_expected.to belong_to(:source_project).with_foreign_key(:source_project_id).class_name('Project') }
+    it { is_expected.to belong_to(:target_project).class_name('Project') }
+    it { is_expected.to belong_to(:source_project).class_name('Project') }
     it { is_expected.to belong_to(:merge_user).class_name("User") }
     it { is_expected.to have_many(:merge_request_diffs).dependent(:destroy) }
     it { is_expected.to have_many(:approver_groups).dependent(:destroy) }
@@ -751,6 +751,37 @@ describe MergeRequest, models: true do
     subject { create :merge_request, :simple }
   end
 
+  describe '#rebase_in_progress?' do
+    it 'returns true' do
+      allow(File).to receive(:exist?).and_return(true)
+      allow(File).to receive(:new).and_return(double(:file, mtime: Time.now))
+
+      expect(subject.rebase_in_progress?).to be_truthy
+    end
+
+    it 'returns false' do
+      allow(File).to receive(:exist?).with(subject.rebase_dir_path).and_return(false)
+
+      expect(subject.rebase_in_progress?).to be_falsey
+    end
+
+    it 'returns false if temporary file exists by is expired' do
+      allow(File).to receive(:exist?).and_return(true)
+      allow(File).to receive(:new).and_return(double(:file, mtime: Time.now - 2.hours))
+
+      expect(subject.rebase_in_progress?).to be_falsey
+    end
+
+    it 'returns false if source_project is removed' do
+      allow(subject).to receive(:source_project).and_return(nil)
+      allow(File).to receive(:exist?).and_return(true)
+      allow(File).to receive(:new).and_return(double(:file, mtime: Time.now))
+
+      expect(File).not_to have_received(:exist?)
+      expect(subject.rebase_in_progress?).to be_falsey
+    end
+  end
+
   describe '#commits_sha' do
     let(:commit0) { double('commit0', sha: 'sha1') }
     let(:commit1) { double('commit1', sha: 'sha2') }
@@ -1020,12 +1051,19 @@ describe MergeRequest, models: true do
     end
 
     context 'when failed' do
-      before { allow(subject).to receive(:broken?) { false } }
-
-      context 'when project settings restrict to merge only if build succeeds and build failed' do
+      context 'when #mergeable_ci_state? is false' do
         before do
-          project.only_allow_merge_if_build_succeeds = true
           allow(subject).to receive(:mergeable_ci_state?) { false }
+        end
+
+        it 'returns false' do
+          expect(subject.mergeable_state?).to be_falsey
+        end
+      end
+
+      context 'when #mergeable_discussions_state? is false' do
+        before do
+          allow(subject).to receive(:mergeable_discussions_state?) { false }
         end
 
         it 'returns false' do
@@ -1044,11 +1082,29 @@ describe MergeRequest, models: true do
     context 'when it is only allowed to merge when build is green' do
       context 'and a failed pipeline is associated' do
         before do
-          pipeline.statuses << create(:commit_status, status: 'failed', project: project)
+          pipeline.update(status: 'failed')
           allow(subject).to receive(:pipeline) { pipeline }
         end
 
         it { expect(subject.mergeable_ci_state?).to be_falsey }
+      end
+
+      context 'and a successful pipeline is associated' do
+        before do
+          pipeline.update(status: 'success')
+          allow(subject).to receive(:pipeline) { pipeline }
+        end
+
+        it { expect(subject.mergeable_ci_state?).to be_truthy }
+      end
+
+      context 'and a skipped pipeline is associated' do
+        before do
+          pipeline.update(status: 'skipped')
+          allow(subject).to receive(:pipeline) { pipeline }
+        end
+
+        it { expect(subject.mergeable_ci_state?).to be_truthy }
       end
 
       context 'when no pipeline is associated' do
@@ -1082,7 +1138,49 @@ describe MergeRequest, models: true do
     end
   end
 
-  describe '#environments' do
+  describe '#mergeable_discussions_state?' do
+    let(:merge_request) { create(:merge_request_with_diff_notes, source_project: project) }
+
+    context 'when project.only_allow_merge_if_all_discussions_are_resolved == true' do
+      let(:project) { create(:project, only_allow_merge_if_all_discussions_are_resolved: true) }
+
+      context 'with all discussions resolved' do
+        before do
+          merge_request.discussions.each { |d| d.resolve!(merge_request.author) }
+        end
+
+        it 'returns true' do
+          expect(merge_request.mergeable_discussions_state?).to be_truthy
+        end
+      end
+
+      context 'with unresolved discussions' do
+        before do
+          merge_request.discussions.each(&:unresolve!)
+        end
+
+        it 'returns false' do
+          expect(merge_request.mergeable_discussions_state?).to be_falsey
+        end
+      end
+    end
+
+    context 'when project.only_allow_merge_if_all_discussions_are_resolved == false' do
+      let(:project) { create(:project, only_allow_merge_if_all_discussions_are_resolved: false) }
+
+      context 'with unresolved discussions' do
+        before do
+          merge_request.discussions.each(&:unresolve!)
+        end
+
+        it 'returns true' do
+          expect(merge_request.mergeable_discussions_state?).to be_truthy
+        end
+      end
+    end
+  end
+
+  describe "#environments" do
     let(:project)       { create(:project) }
     let(:merge_request) { create(:merge_request, source_project: project) }
 
@@ -1687,7 +1785,8 @@ describe MergeRequest, models: true do
         let(:project)      { create(:project) }
         let(:user)         { create(:user) }
         let(:fork_project) { create(:project, forked_from_project: project, namespace: user.namespace) }
-        let(:merge_request) do
+
+        let!(:merge_request) do
           create(:closed_merge_request,
             source_project: fork_project,
             target_project: project)

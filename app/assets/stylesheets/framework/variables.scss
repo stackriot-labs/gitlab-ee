@@ -5,7 +5,7 @@ $sidebar_collapsed_width: 62px;
 $sidebar_width: 220px;
 $gutter_collapsed_width: 62px;
 $gutter_width: 290px;
-$gutter_inner_width: 258px;
+$gutter_inner_width: 250px;
 $sidebar-transition-duration: .15s;
 $sidebar-breakpoint: 1024px;
 
@@ -90,6 +90,9 @@ $table-border-color: #f0f0f0;
 $background-color: $gray-light;
 $dark-background-color: #f5f5f5;
 $table-text-gray: #8f8f8f;
+$sidebar-collapsed-icon-color: #999;
+$well-expand-item: #e8f2f7;
+$well-inner-border: #eef0f2;
 
 /*
  * Text
@@ -101,7 +104,7 @@ $gl-text-color-light: #8c8c8c;
 $gl-text-green: #4a2;
 $gl-text-red: #d12f19;
 $gl-text-orange: #d90;
-$gl-link-color: #3084bb;
+$gl-link-color: #3777b0;
 $gl-dark-link-color: #333;
 $gl-placeholder-color: #8f8f8f;
 $gl-icon-color: $gl-placeholder-color;
@@ -158,6 +161,7 @@ $settings-icon-size: 18px;
 $provider-btn-group-border: #e5e5e5;
 $provider-btn-not-active-color: #4688f1;
 $link-underline-blue: #4a8bee;
+$active-item-blue: #4a8bee;
 $layout-link-gray: #7e7c7c;
 $todo-alert-blue: #428bca;
 $btn-side-margin: 10px;
@@ -195,7 +199,7 @@ $line-number-new: #ddfbe6;
 $line-number-select: #fbf2da;
 $match-line: $gray-light;
 $table-border-gray: #f0f0f0;
-$line-target-blue: #eaf3fc;
+$line-target-blue: #f6faff;
 $line-select-yellow: #fcf8e7;
 $line-select-yellow-dark: #f0e2bd;
 
@@ -250,7 +254,7 @@ $award-emoji-new-btn-icon-color: #dcdcdc;
  */
 $search-input-border-color: rgba(#4688f1, .8);
 $search-input-focus-shadow-color: $dropdown-input-focus-shadow;
-$search-input-width: 244px;
+$search-input-width: 220px;
 $location-badge-color: #aaa;
 $location-badge-bg: $gray-normal;
 $location-badge-active-bg: #4f91f8;
@@ -281,6 +285,9 @@ $calendar-unselectable-bg: $gray-light;
  */
 $cycle-analytics-box-padding: 30px;
 $cycle-analytics-box-text-color: #8c8c8c;
+$cycle-analytics-big-font: 19px;
+$cycle-analytics-dark-text: $gl-title-color;
+$cycle-analytics-light-gray: #bfbfbf;
 
 /*
  * Personal Access Tokens

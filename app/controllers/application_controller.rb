@@ -196,9 +196,10 @@ class ApplicationController < ActionController::Base
   end
 
   # JSON for infinite scroll via Pager object
-  def pager_json(partial, count)
+  def pager_json(partial, count, locals = {})
     html = render_to_string(
       partial,
+      locals: locals,
       layout: false,
       formats: [:html]
     )
@@ -230,48 +231,6 @@ class ApplicationController < ActionController::Base
     if current_user && current_user.temp_oauth_email?
       redirect_to profile_path, notice: 'Please complete your profile with email address' and return
     end
-  end
-
-  def require_ldap_enabled
-    unless Gitlab.config.ldap.enabled
-      render_404 and return
-    end
-  end
-
-  def set_filters_params
-    set_default_sort
-
-    params[:scope] = 'all' if params[:scope].blank?
-    params[:state] = 'opened' if params[:state].blank?
-
-    @sort = params[:sort]
-    @filter_params = params.dup
-
-    if @project
-      @filter_params[:project_id] = @project.id
-    elsif @group
-      @filter_params[:group_id] = @group.id
-    else
-      # TODO: this filter ignore issues/mr created in public or
-      # internal repos where you are not a member. Enable this filter
-      # or improve current implementation to filter only issues you
-      # created or assigned or mentioned
-      # @filter_params[:authorized_only] = true
-    end
-
-    @filter_params
-  end
-
-  def get_issues_collection
-    set_filters_params
-    @issuable_finder = IssuesFinder.new(current_user, @filter_params)
-    @issuable_finder.execute
-  end
-
-  def get_merge_requests_collection
-    set_filters_params
-    @issuable_finder = MergeRequestsFinder.new(current_user, @filter_params)
-    @issuable_finder.execute
   end
 
   def import_sources_enabled?

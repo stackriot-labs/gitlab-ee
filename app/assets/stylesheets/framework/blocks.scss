@@ -128,7 +128,8 @@
   position: relative;
 
   .avatar-holder {
-    .avatar, .identicon {
+    .avatar,
+    .identicon {
       margin: 0 auto;
       float: none;
     }
@@ -252,4 +253,33 @@
 
 .content-block-small {
   padding: 10px 0;
+}
+
+.empty-state {
+  margin: 100px 0 0;
+
+  .text-content {
+    max-width: 460px;
+    margin: 0 auto;
+    padding: $gl-padding;
+  }
+
+  .svg-content {
+    text-align: center;
+
+    svg {
+      max-width: 425px;
+      width: 100%;
+      padding: $gl-padding;
+    }
+  }
+
+  @media(max-width: $screen-xs-max) {
+    margin-top: 50px;
+    text-align: center;
+
+    .btn {
+      width: 100%;
+    }
+  }
 }

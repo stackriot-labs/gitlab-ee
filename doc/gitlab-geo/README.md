@@ -43,18 +43,14 @@ Keep in mind that:
 
 ## Setup instructions
 
-GitLab Geo requires some additional work installing and configuring your
-instance, than a normal setup.
+In order to set up one or more GitLab Geo instances, follow the steps below in
+this **exact order**:
 
-There are a couple of things you need to do in order to have one or more GitLab
-Geo instances. Follow the steps below in the **exact order** that they appear:
-
-1. Follow the instructions to [install GitLab Enterprise Edition][install-ee]
-   on the server that will serve as the secondary Geo node, but don't further
-   configure GitLab as authentication will be handled by the primary node (more
-   on this in the configuration step).
-1. [Setup a database replication](database.md) in `primary <-> secondary (read-only)` topology.
-1. [Configure GitLab](configuration.md) and set the primary and secondary nodes.
+1. Follow the first 3 steps to [install GitLab Enterprise Edition][install-ee]
+   on the server that will serve as the secondary Geo node. Do not login or
+   set up anything else in the secondary node for the moment.
+1. [Setup the database replication](database.md)  (`primary <-> secondary (read-only)` topology)
+1. [Configure GitLab](configuration.md) to set the primary and secondary nodes.
 
 ## After setup
 
@@ -73,8 +69,10 @@ there are a few things to consider:
          git remote set-url --push origin git@primary.gitlab.example.com:user/repo.git
          ```
 
-> **Important**: The initialization of a new Geo secondary node requires data
-to be copied from the primary, as there is no backfill feature bundled with it.
+>**Important**:
+The initialization of a new Geo secondary node on versions older than 8.14 
+requires data to be copied from the primary, as there is no backfill 
+feature bundled with those versions.
 See more details in the [Configure GitLab](configuration.md) step.
 
 ## Current limitations
@@ -88,7 +86,8 @@ See more details in the [Configure GitLab](configuration.md) step.
 
 ### Can I use Geo in a disaster recovery situation?
 
-There are limitations to what we replicate (see Current limitations).
+There are limitations to what we replicate (see
+[What data is replicated to a secondary node?](#what-data-is-replicated-to-a-secondary-node)).
 In an extreme data-loss situation you can make a secondary Geo into your
 primary, but this is not officially supported yet.
 

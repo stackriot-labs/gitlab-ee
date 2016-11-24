@@ -1,3 +1,4 @@
+/* eslint-disable */
 (function() {
   var Dispatcher;
 
@@ -27,6 +28,9 @@
         case 'projects:boards:show':
         case 'projects:boards:index':
           shortcut_handler = new ShortcutsNavigation();
+          break;
+        case 'projects:builds:show':
+          new Build();
           break;
         case 'projects:merge_requests:index':
         case 'projects:issues:index':
@@ -66,6 +70,7 @@
           new IssuableForm($('.issue-form'));
           new LabelsSelect();
           new MilestoneSelect();
+          new WeightSelect();
           new gl.IssuableTemplateSelectors();
           break;
         case 'projects:merge_requests:new':
@@ -106,10 +111,10 @@
           Issuable.init();
           break;
         case 'dashboard:activity':
-          new Activities();
+          new gl.Activities();
           break;
         case 'dashboard:projects:starred':
-          new Activities();
+          new gl.Activities();
           break;
         case 'projects:commit:show':
           new Commit();
@@ -135,7 +140,7 @@
           new gl.Pipelines();
           break;
         case 'groups:activity':
-          new Activities();
+          new gl.Activities();
           break;
         case 'groups:show':
           shortcut_handler = new ShortcutsNavigation();
@@ -210,9 +215,6 @@
         case 'projects:protected_branches:index':
           new gl.ProtectedBranchCreate();
           new gl.ProtectedBranchEditList();
-          break;
-        case 'projects:cycle_analytics:show':
-          new gl.CycleAnalytics();
           break;
       }
       switch (path.first()) {
@@ -308,7 +310,7 @@
     };
 
     Dispatcher.prototype.initFieldErrors = function() {
-      $('.show-gl-field-errors').each((i, form) => {
+      $('.gl-show-field-errors').each((i, form) => {
         new gl.GlFieldErrors(form);
       });
     };

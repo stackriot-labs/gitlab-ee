@@ -6,7 +6,8 @@
   }
 }
 
-.no-ssh-key-message, .project-limit-message {
+.no-ssh-key-message,
+.project-limit-message {
   background-color: #f28d35;
   margin-bottom: 0;
 }
@@ -85,7 +86,8 @@
   }
 }
 
-.project-home-panel {
+.project-home-panel,
+.group-home-panel {
   padding-top: 24px;
   padding-bottom: 24px;
 
@@ -93,17 +95,19 @@
     border-bottom: 1px solid $border-color;
   }
 
-  .project-avatar {
+  .project-avatar,
+  .group-avatar {
     float: none;
-    margin-left: auto;
-    margin-right: auto;
+    margin: 0 auto;
+    border: none;
 
     &.identicon {
       border-radius: 50%;
     }
   }
 
-  .project-title {
+  .project-title,
+  .group-title {
     margin-top: 10px;
     margin-bottom: 10px;
     font-size: 24px;
@@ -117,10 +121,11 @@
     }
   }
 
-  .project-home-desc {
+  .project-home-desc,
+  .group-home-desc {
     margin-left: auto;
     margin-right: auto;
-    margin-bottom: 15px;
+    margin-bottom: 0;
     max-width: 700px;
 
     > p {
@@ -140,12 +145,21 @@
   }
 }
 
-.project-repo-buttons {
-  font-size: 0;
+.nav > .project-repo-buttons {
+  margin-top: 0;
+}
+
+.project-repo-buttons,
+.group-buttons {
+  margin-top: 15px;
 
   .btn {
     @include btn-gray;
     padding: 3px 10px;
+
+    &:last-child {
+      margin-left: 0;
+    }
 
     .fa {
       color: $layout-link-gray;
@@ -167,10 +181,17 @@
     }
   }
 
-  .project-repo-btn-group,
+  .download-button,
+  .dropdown-toggle,
   .notification-dropdown,
   .project-dropdown {
     margin-left: 10px;
+  }
+
+  .download-button {
+    @media (max-width: $screen-lg-min) {
+      margin-left: 0;
+    }
   }
 
   .count-buttons {
@@ -192,7 +213,7 @@
     margin-left: 4px;
 
     .arrow {
-      &:before {
+      &::before {
         content: '';
         display: inline-block;
         position: absolute;
@@ -208,7 +229,7 @@
         pointer-events: none;
       }
 
-      &:after {
+      &::after {
         content: '';
         position: absolute;
         width: 0;
@@ -350,7 +371,7 @@ a.deploy-project-label {
   line-height: 36px;
   margin: 0;
 
-  > li + li:before {
+  > li + li::before {
     padding: 0 3px;
     color: #999;
   }
@@ -385,7 +406,8 @@ a.deploy-project-label {
       text-align: center;
       width: 169px;
 
-      &:hover, &.forked {
+      &:hover,
+      &.forked {
         background-color: $row-hover;
         border-color: $row-hover-border;
       }
@@ -456,6 +478,20 @@ a.deploy-project-label {
   }
 }
 
+.page-sidebar-pinned {
+  .project-stats .nav > li.right {
+    @media (min-width: $screen-lg-min) {
+      float: none;
+    }
+  }
+
+  .download-button {
+    @media (min-width: $screen-lg-min) {
+      margin-left: 0;
+    }
+  }
+}
+
 .project-stats {
   font-size: 0;
   border-bottom: 1px solid $border-color;
@@ -472,12 +508,12 @@ a.deploy-project-label {
       margin-right: $gl-padding;
     }
 
-    &.project-repo-buttons-right {
-      margin-top: 10px;
+    &.right {
+      vertical-align: top;
+      margin-top: 0;
 
-      @media (min-width: $screen-md-min) {
+      @media (min-width: $screen-lg-min) {
         float: right;
-        margin-top: 0;
       }
     }
   }
@@ -711,13 +747,17 @@ pre.light-well {
   }
 }
 
-a.allowed-to-merge, a.allowed-to-push {
+a.allowed-to-merge,
+a.allowed-to-push {
   cursor: pointer;
   cursor: hand;
 }
 
-.protected-branch-push-access-list, .protected-branch-merge-access-list {
-  a { color: #fff; }
+.protected-branch-push-access-list,
+.protected-branch-merge-access-list {
+  a {
+    color: #fff;
+  }
 }
 
 .protected-branches-list {
@@ -743,7 +783,8 @@ a.allowed-to-merge, a.allowed-to-push {
   .table-bordered {
     border-radius: 1px;
 
-    th:not(:last-child), td:not(:last-child) {
+    th:not(:last-child),
+    td:not(:last-child) {
       border-right: solid 1px transparent;
     }
   }
@@ -770,7 +811,8 @@ a.allowed-to-merge, a.allowed-to-push {
   }
 }
 
-.project-refs-form .dropdown-menu, .dropdown-menu-projects {
+.project-refs-form .dropdown-menu,
+.dropdown-menu-projects {
   width: 300px;
 
   @media (min-width: $screen-sm-min) {
@@ -815,7 +857,7 @@ a.allowed-to-merge, a.allowed-to-push {
     top: 7px;
     color: $location-icon-color;
 
-    &:before {
+    &::before {
       font-family: FontAwesome;
       font-weight: normal;
       font-style: normal;

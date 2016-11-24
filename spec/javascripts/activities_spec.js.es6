@@ -1,4 +1,5 @@
-/*= require jquery.cookie.js */
+/* eslint-disable */
+/*= require js.cookie.js */
 /*= require jquery.endless-scroll.js */
 /*= require pager */
 /*= require activities */
@@ -34,7 +35,7 @@
   describe('Activities', () => {
     beforeEach(() => {
       fixture.load(fixtureTemplate);
-      new Activities();
+      new gl.Activities();
     });
 
     for(let i = 0; i < filters.length; i++) {

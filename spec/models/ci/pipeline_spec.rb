@@ -138,32 +138,26 @@ describe Ci::Pipeline, models: true do
 
   describe 'state machine' do
     let(:current) { Time.now.change(usec: 0) }
-    let(:build) { create_build('build1', current, 10) }
-    let(:build_b) { create_build('build2', current, 20) }
-    let(:build_c) { create_build('build3', current + 50, 10) }
+    let(:build) { create_build('build1', 0) }
+    let(:build_b) { create_build('build2', 0) }
+    let(:build_c) { create_build('build3', 0) }
 
     describe '#duration' do
       before do
-        pipeline.update(created_at: current)
-
-        travel_to(current + 5) do
-          pipeline.run
-          pipeline.save
-        end
-
         travel_to(current + 30) do
-          build.success
+          build.run!
+          build.success!
+          build_b.run!
+          build_c.run!
         end
 
         travel_to(current + 40) do
-          build_b.drop
+          build_b.drop!
         end
 
         travel_to(current + 70) do
-          build_c.success
+          build_c.success!
         end
-
-        pipeline.drop
       end
 
       it 'matches sum of builds duration' do
@@ -455,7 +449,9 @@ describe Ci::Pipeline, models: true do
         context 'when all builds succeed' do
           before do
             build_a.success
-            build_b.success
+
+            # We have to reload build_b as this is in next stage and it gets triggered by PipelineProcessWorker
+            build_b.reload.success
           end
 
           it 'receives a success event once' do
@@ -526,6 +522,80 @@ describe Ci::Pipeline, models: true do
       allow_any_instance_of(MergeRequest).to receive(:diff_head_sha) { '97de212e80737a608d939f648d959671fb0a0142b' }
 
       expect(pipeline.merge_requests).to be_empty
+    end
+  end
+
+  describe 'notifications when pipeline success or failed' do
+    let(:project) { create(:project) }
+
+    let(:pipeline) do
+      create(:ci_pipeline,
+             project: project,
+             sha: project.commit('master').sha,
+             user: create(:user))
+    end
+
+    before do
+      reset_delivered_emails!
+
+      project.team << [pipeline.user, Gitlab::Access::DEVELOPER]
+
+      perform_enqueued_jobs do
+        pipeline.enqueue
+        pipeline.run
+      end
+    end
+
+    shared_examples 'sending a notification' do
+      it 'sends an email' do
+        should_only_email(pipeline.user, kind: :bcc)
+      end
+    end
+
+    shared_examples 'not sending any notification' do
+      it 'does not send any email' do
+        should_not_email_anyone
+      end
+    end
+
+    context 'with success pipeline' do
+      before do
+        perform_enqueued_jobs do
+          pipeline.succeed
+        end
+      end
+
+      it_behaves_like 'sending a notification'
+    end
+
+    context 'with failed pipeline' do
+      before do
+        perform_enqueued_jobs do
+          pipeline.drop
+        end
+      end
+
+      it_behaves_like 'sending a notification'
+    end
+
+    context 'with skipped pipeline' do
+      before do
+        perform_enqueued_jobs do
+          pipeline.skip
+        end
+      end
+
+      it_behaves_like 'not sending any notification'
+    end
+
+    context 'with cancelled pipeline' do
+      before do
+        perform_enqueued_jobs do
+          pipeline.cancel
+        end
+      end
+
+      it_behaves_like 'not sending any notification'
     end
   end
 end

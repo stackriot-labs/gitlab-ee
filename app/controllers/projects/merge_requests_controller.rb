@@ -22,6 +22,7 @@ class Projects::MergeRequestsController < Projects::ApplicationController
   before_action :close_merge_request_without_source_project, only: [:show, :diffs, :commits, :builds, :pipelines]
   before_action :apply_diff_view_cookie!, only: [:new_diffs]
   before_action :build_merge_request, only: [:new, :new_diffs]
+  before_action :set_suggested_approvers, only: [:new, :new_diffs, :edit]
 
   # Allow read any merge_request
   before_action :authorize_read_merge_request!
@@ -39,7 +40,6 @@ class Projects::MergeRequestsController < Projects::ApplicationController
   def index
     @merge_requests = merge_requests_collection
     @merge_requests = @merge_requests.page(params[:page])
-    @merge_requests = @merge_requests.preload(:target_project)
 
     if params[:label_name].present?
       labels_params = { project_id: @project.id, title: params[:label_name] }
@@ -62,7 +62,7 @@ class Projects::MergeRequestsController < Projects::ApplicationController
       format.html { define_discussion_vars }
 
       format.json do
-        render json: @merge_request, methods: :rebase_in_progress?
+        render json: MergeRequestSerializer.new.represent(@merge_request, type: :full)
       end
 
       format.patch  do
@@ -84,12 +84,12 @@ class Projects::MergeRequestsController < Projects::ApplicationController
 
     @merge_request_diff =
       if params[:diff_id]
-        @merge_request.merge_request_diffs.find(params[:diff_id])
+        @merge_request.merge_request_diffs.viewable.find(params[:diff_id])
       else
         @merge_request.merge_request_diff
       end
 
-    @merge_request_diffs = @merge_request.merge_request_diffs.select_without_diff
+    @merge_request_diffs = @merge_request.merge_request_diffs.viewable.select_without_diff
     @comparable_diffs = @merge_request_diffs.select { |diff| diff.id < @merge_request_diff.id }
 
     if params[:start_sha].present?
@@ -229,7 +229,6 @@ class Projects::MergeRequestsController < Projects::ApplicationController
 
   def new
     define_new_vars
-    set_suggested_approvers
   end
 
   def new_diffs
@@ -272,8 +271,6 @@ class Projects::MergeRequestsController < Projects::ApplicationController
     @source_project = @merge_request.source_project
     @target_project = @merge_request.target_project
     @target_branches = @merge_request.target_project.repository.branch_names
-
-    set_suggested_approvers
   end
 
   def update
@@ -288,7 +285,7 @@ class Projects::MergeRequestsController < Projects::ApplicationController
                        @merge_request.target_project, @merge_request])
         end
         format.json do
-          render json: @merge_request.to_json(include: { milestone: {}, assignee: { methods: :avatar_url }, labels: { methods: :text_color } })
+          render json: @merge_request.to_json(include: { milestone: {}, assignee: { methods: :avatar_url }, labels: { methods: :text_color } }, methods: [:task_status, :task_status_short])
         end
       end
     else
@@ -379,13 +376,23 @@ class Projects::MergeRequestsController < Projects::ApplicationController
   def branch_from
     # This is always source
     @source_project = @merge_request.nil? ? @project : @merge_request.source_project
-    @commit = @repository.commit(params[:ref]) if params[:ref].present?
+
+    if params[:ref].present?
+      @ref = params[:ref]
+      @commit = @repository.commit(@ref)
+    end
+
     render layout: false
   end
 
   def branch_to
     @target_project = selected_target_project
-    @commit = @target_project.commit(params[:ref]) if params[:ref].present?
+
+    if params[:ref].present?
+      @ref = params[:ref]
+      @commit = @target_project.commit(@ref)
+    end
+
     render layout: false
   end
 
@@ -435,7 +442,7 @@ class Projects::MergeRequestsController < Projects::ApplicationController
 
     response = {
       title: merge_request.title,
-      sha: merge_request.diff_head_commit.short_id,
+      sha: (merge_request.diff_head_commit.short_id if merge_request.diff_head_sha),
       status: status,
       coverage: coverage
     }
@@ -536,6 +543,7 @@ class Projects::MergeRequestsController < Projects::ApplicationController
       @merge_request.close
     end
 
+    labels
     define_pipelines_vars
   end
 
@@ -593,7 +601,7 @@ class Projects::MergeRequestsController < Projects::ApplicationController
   def define_pipelines_vars
     @pipelines = @merge_request.all_pipelines
 
-    if @pipelines.present?
+    if @pipelines.present? && @merge_request.commits.present?
       @pipeline = @pipelines.first
       @statuses = @pipeline.statuses.relevant
     end
@@ -636,12 +644,35 @@ class Projects::MergeRequestsController < Projects::ApplicationController
   end
 
   def merge_request_params
-    params.require(:merge_request).permit(
-      :title, :assignee_id, :source_project_id, :source_branch,
-      :target_project_id, :target_branch, :milestone_id, :approver_ids,
-      :state_event, :description, :task_num, :force_remove_source_branch,
-      :approvals_before_merge, :lock_version, :approver_group_ids, label_ids: []
-    )
+    params.require(:merge_request)
+      .permit(merge_request_params_ce << merge_request_params_ee)
+  end
+
+  def merge_request_params_ce
+    [
+      :assignee_id,
+      :description,
+      :force_remove_source_branch,
+      :lock_version,
+      :milestone_id,
+      :source_branch,
+      :source_project_id,
+      :state_event,
+      :target_branch,
+      :target_project_id,
+      :task_num,
+      :title,
+
+      label_ids: []
+    ]
+  end
+
+  def merge_request_params_ee
+    %i[
+      approvals_before_merge
+      approver_group_ids
+      approver_ids
+    ]
   end
 
   def clamp_approvals_before_merge(mr_params)

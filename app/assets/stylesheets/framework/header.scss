@@ -15,7 +15,8 @@ header {
       margin: 8px 0;
       text-align: center;
 
-      .tanuki-logo, img {
+      .tanuki-logo,
+      img {
         height: 36px;
       }
     }
@@ -48,14 +49,25 @@ header {
         font-size: 18px;
         padding: 0;
         margin: ($header-height - 28) / 2 0;
-        margin-left: 10px;
+        margin-left: 8px;
         height: 28px;
         min-width: 28px;
         line-height: 28px;
         text-align: center;
 
-        &:hover, &:focus, &:active {
+        &.header-user-dropdown-toggle {
+          margin-left: 14px;
+        }
+
+        &:hover,
+        &:focus,
+        &:active {
           background-color: $background-color;
+          color: darken($gl-icon-color, 30%);
+
+          .todos-pending-count {
+            background: darken($todo-alert-blue, 10%);
+          }
         }
 
         .fa-caret-down {
@@ -93,10 +105,6 @@ header {
       &:hover {
         background-color: $btn-gray-hover;
       }
-
-      &:focus {
-        outline: none;
-      }
     }
   }
 
@@ -125,7 +133,8 @@ header {
         left: -50%;
       }
 
-      svg, img {
+      svg,
+      img {
         height: 36px;
       }
 
@@ -148,7 +157,7 @@ header {
       padding-right: 20px;
       margin: 0;
       font-size: 19px;
-      max-width: 400px;
+      max-width: 385px;
       display: inline-block;
       line-height: $header-height;
       font-weight: normal;
@@ -187,6 +196,10 @@ header {
         font-size: 10px;
         text-align: center;
         cursor: pointer;
+
+        &:hover {
+          color: darken($color: $gl-text-color, $amount: 30%);
+        }
       }
 
       .project-item-select {
@@ -214,6 +227,14 @@ header {
   }
 }
 
+.page-sidebar-pinned.right-sidebar-expanded {
+  @media (max-width: $screen-lg-min) {
+    .header-content .title {
+      width: 300px;
+    }
+  }
+}
+
 @media (max-width: $screen-xs-max) {
   header .container-fluid {
     font-size: 18px;
@@ -222,7 +243,8 @@ header {
       margin: 0;
       float: none !important;
 
-      .visible-xs, .visable-sm {
+      .visible-xs,
+      .visible-sm {
         display: table-cell !important;
       }
     }

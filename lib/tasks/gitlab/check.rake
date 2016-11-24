@@ -761,7 +761,7 @@ namespace :gitlab do
   end
 
   namespace :ldap do
-    task :check, [:limit] => :environment do |t, args|
+    task :check, [:limit] => :environment do |_, args|
       # Only show up to 100 results because LDAP directories can be very big.
       # This setting only affects the `rake gitlab:check` script.
       args.with_defaults(limit: 100)
@@ -769,7 +769,7 @@ namespace :gitlab do
       start_checking "LDAP"
 
       if Gitlab::LDAP::Config.enabled?
-        print_users(args.limit)
+        check_ldap(args.limit)
       else
         puts 'LDAP is disabled in config/gitlab.yml'
       end
@@ -777,20 +777,41 @@ namespace :gitlab do
       finished_checking "LDAP"
     end
 
-    def print_users(limit)
-      puts "LDAP users with access to your GitLab server (only showing the first #{limit} results)"
-
+    def check_ldap(limit)
       servers = Gitlab::LDAP::Config.providers
 
       servers.each do |server|
         puts "Server: #{server}"
-        Gitlab::LDAP::Adapter.open(server) do |adapter|
-          users = adapter.users(adapter.config.uid, '*', limit)
-          users.each do |user|
-            puts "\tDN: #{user.dn}\t #{adapter.config.uid}: #{user.uid}"
+
+        begin
+          Gitlab::LDAP::Adapter.open(server) do |adapter|
+            check_ldap_auth(adapter)
+
+            puts "LDAP users with access to your GitLab server (only showing the first #{limit} results)"
+
+            users = adapter.users(adapter.config.uid, '*', limit)
+            users.each do |user|
+              puts "\tDN: #{user.dn}\t #{adapter.config.uid}: #{user.uid}"
+            end
           end
+        rescue Net::LDAP::ConnectionRefusedError, Errno::ECONNREFUSED => e
+          puts "Could not connect to the LDAP server: #{e.message}".color(:red)
         end
       end
+    end
+
+    def check_ldap_auth(adapter)
+      auth = adapter.config.has_auth?
+
+      if auth && adapter.ldap.bind
+        message = 'Success'.color(:green)
+      elsif auth
+        message = 'Failed. Check `bind_dn` and `password` configuration values'.color(:red)
+      else
+        message = 'Anonymous. No `bind_dn` or `password` configured'.color(:yellow)
+      end
+
+      puts "LDAP authentication... #{message}"
     end
   end
 
@@ -986,15 +1007,14 @@ namespace :gitlab do
     client = Elasticsearch::Client.new(host: ApplicationSetting.current.elasticsearch_host,
                                        port: ApplicationSetting.current.elasticsearch_port)
 
-    print "Elasticsearch version >= 2.4? ... "
+    print "Elasticsearch version 2.4.x? ... "
 
-    version = client.info["version"]["number"]
+    version = Gitlab::VersionInfo.parse(client.info["version"]["number"])
 
-    # The version is greater or equal to 2.4.0
-    if Gitlab::VersionInfo.parse(version) >= Gitlab::VersionInfo.new(2, 4, 0)
+    if version.major == 2 && version.minor == 4
       puts "yes (#{version})".color(:green)
     else
-      puts "no".color(:red)
+      puts "no, you have #{version}".color(:red)
     end
 
     print "Elasticsearch has plugin delete-by-query installed? ... "

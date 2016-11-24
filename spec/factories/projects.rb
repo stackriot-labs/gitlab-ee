@@ -41,6 +41,10 @@ FactoryGirl.define do
       mirror_user_id { creator_id }
     end
 
+    trait :access_requestable do
+      request_access_enabled true
+    end
+
     trait :empty_repo do
       after(:create) do |project|
         project.create_repository
@@ -70,13 +74,17 @@ FactoryGirl.define do
     end
 
     after(:create) do |project, evaluator|
+      # Builds and MRs can't have higher visibility level than repository access level.
+      builds_access_level = [evaluator.builds_access_level, evaluator.repository_access_level].min
+      merge_requests_access_level = [evaluator.merge_requests_access_level, evaluator.repository_access_level].min
+
       project.project_feature.
-        update_attributes(
+        update_attributes!(
           wiki_access_level: evaluator.wiki_access_level,
-          builds_access_level: evaluator.builds_access_level,
+          builds_access_level: builds_access_level,
           snippets_access_level: evaluator.snippets_access_level,
           issues_access_level: evaluator.issues_access_level,
-          merge_requests_access_level: evaluator.merge_requests_access_level,
+          merge_requests_access_level: merge_requests_access_level,
           repository_access_level: evaluator.repository_access_level
         )
     end
@@ -139,10 +147,9 @@ FactoryGirl.define do
       project.create_jira_service(
         active: true,
         properties: {
-          'title'         => 'JIRA tracker',
-          'project_url'   => 'http://jira.example/issues/?jql=project=A',
-          'issues_url'    => 'http://jira.example/browse/:id',
-          'new_issue_url' => 'http://jira.example/secure/CreateIssue.jspa'
+          title: 'JIRA tracker',
+          url: 'http://jira.example.net',
+          project_key: 'JIRA'
         }
       )
     end

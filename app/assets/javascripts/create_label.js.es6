@@ -1,3 +1,4 @@
+/* eslint-disable */
 (function (w) {
   class CreateLabelDropdown {
     constructor ($el, namespacePath, projectPath) {
@@ -114,6 +115,8 @@
             .show();
         } else {
           this.$dropdownBack.trigger('click');
+
+          $(document).trigger('created.label', label);
         }
       });
     }

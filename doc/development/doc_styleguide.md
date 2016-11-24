@@ -93,6 +93,8 @@ merge request.
   links shift too, which eventually leads to dead links. If you think it is
   compelling to add numbers in headings, make sure to at least discuss it with
   someone in the Merge Request
+- Avoid adding things that show ephemeral statuses. For example, if a feature is
+  considered beta or experimental, put this info in a note, not in the heading.
 - When introducing a new document, be careful for the headings to be
   grammatically and syntactically correct. It is advised to mention one or all
   of the following GitLab members for a review: `@axil`, `@rspeicher`, `@marcia`,
@@ -342,12 +344,6 @@ You can use the following fake tokens as examples.
 Here is a list of must-have items. Use them in the exact order that appears
 on this document. Further explanation is given below.
 
-- Every method must be described using [Grape's DSL](https://github.com/ruby-grape/grape/tree/v0.13.0#describing-methods)
-  (see https://gitlab.com/gitlab-org/gitlab-ce/blob/master/lib/api/environments.rb
-  for a good example):
-  - `desc` for the method summary (you can pass it a block for additional details)
-  - `params` for the method params (this acts as description **and** validation
-    of the params)
 - Every method must have the REST API request. For example:
 
     ```
@@ -469,6 +465,7 @@ curl --request PUT --header "PRIVATE-TOKEN: 9koXpg98eAheJpvBs5tK" --data "domain
 [cURL]: http://curl.haxx.se/ "cURL website"
 [single spaces]: http://www.slate.com/articles/technology/technology/2011/01/space_invaders.html
 [gfm]: http://docs.gitlab.com/ce/user/markdown.html#newlines "GitLab flavored markdown documentation"
+[ce-1242]: https://gitlab.com/gitlab-org/gitlab-ce/issues/1242
 [doc-restart]: ../administration/restart_gitlab.md "GitLab restart documentation"
 [ce-3349]: https://gitlab.com/gitlab-org/gitlab-ce/issues/3349 "Documentation restructure"
 [graffle]: https://gitlab.com/gitlab-org/gitlab-design/blob/d8d39f4a87b90fb9ae89ca12dc565347b4900d5e/production/resources/gitlab-map.graffle

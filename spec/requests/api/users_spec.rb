@@ -48,6 +48,17 @@ describe API::API, api: true  do
         end['username']).to eq(username)
       end
 
+      it "returns an array of blocked users" do
+        ldap_blocked_user
+        create(:user, state: 'blocked')
+
+        get api("/users?blocked=true", user)
+
+        expect(response).to have_http_status(200)
+        expect(json_response).to be_an Array
+        expect(json_response).to all(include('state' => /(blocked|ldap_blocked)/))
+      end
+
       it "returns one user" do
         get api("/users?username=#{omniauth_user.username}", user)
         expect(response).to have_http_status(200)
@@ -68,6 +79,16 @@ describe API::API, api: true  do
         expect(json_response.first.keys).to include 'two_factor_enabled'
         expect(json_response.first.keys).to include 'last_sign_in_at'
         expect(json_response.first.keys).to include 'confirmed_at'
+      end
+
+      it "returns an array of external users" do
+        create(:user, external: true)
+
+        get api("/users?external=true", admin)
+
+        expect(response).to have_http_status(200)
+        expect(json_response).to be_an Array
+        expect(json_response).to all(include('external' => true))
       end
     end
 
@@ -99,7 +120,7 @@ describe API::API, api: true  do
     it "returns a 404 error if user id not found" do
       get api("/users/9999", user)
       expect(response).to have_http_status(404)
-      expect(json_response['message']).to eq('404 Not found')
+      expect(json_response['message']).to eq('404 User Not Found')
     end
 
     it "returns a 404 for invalid ID" do
@@ -350,7 +371,7 @@ describe API::API, api: true  do
     it "returns 404 for non-existing user" do
       put api("/users/999999", admin), { bio: 'update should fail' }
       expect(response).to have_http_status(404)
-      expect(json_response['message']).to eq('404 Not found')
+      expect(json_response['message']).to eq('404 User Not Found')
     end
 
     it "returns a 404 if invalid ID" do
@@ -376,6 +397,18 @@ describe API::API, api: true  do
         to eq(['must be greater than or equal to 0'])
       expect(json_response['message']['username']).
         to eq([Gitlab::Regex.namespace_regex_message])
+    end
+
+    it 'returns 400 if provider is missing for identity update' do
+      put api("/users/#{omniauth_user.id}", admin), extern_uid: '654321'
+
+      expect(response).to have_http_status(400)
+    end
+
+    it 'returns 400 if external UID is missing for identity update' do
+      put api("/users/#{omniauth_user.id}", admin), provider: 'ldap'
+
+      expect(response).to have_http_status(400)
     end
 
     context "with existing user" do
@@ -405,14 +438,16 @@ describe API::API, api: true  do
 
     it "does not create invalid ssh key" do
       post api("/users/#{user.id}/keys", admin), { title: "invalid key" }
+
       expect(response).to have_http_status(400)
-      expect(json_response['message']).to eq('400 (Bad request) "key" not given')
+      expect(json_response['error']).to eq('key is missing')
     end
 
     it 'does not create key without title' do
       post api("/users/#{user.id}/keys", admin), key: 'some key'
+
       expect(response).to have_http_status(400)
-      expect(json_response['message']).to eq('400 (Bad request) "title" not given')
+      expect(json_response['error']).to eq('title is missing')
     end
 
     it "creates ssh key" do
@@ -428,7 +463,7 @@ describe API::API, api: true  do
     end
   end
 
-  describe 'GET /user/:uid/keys' do
+  describe 'GET /user/:id/keys' do
     before { admin }
 
     context 'when unauthenticated' do
@@ -456,7 +491,7 @@ describe API::API, api: true  do
     end
   end
 
-  describe 'DELETE /user/:uid/keys/:id' do
+  describe 'DELETE /user/:id/keys/:key_id' do
     before { admin }
 
     context 'when unauthenticated' do
@@ -497,8 +532,9 @@ describe API::API, api: true  do
 
     it "does not create invalid email" do
       post api("/users/#{user.id}/emails", admin), {}
+
       expect(response).to have_http_status(400)
-      expect(json_response['message']).to eq('400 (Bad request) "email" not given')
+      expect(json_response['error']).to eq('email is missing')
     end
 
     it "creates email" do
@@ -515,7 +551,7 @@ describe API::API, api: true  do
     end
   end
 
-  describe 'GET /user/:uid/emails' do
+  describe 'GET /user/:id/emails' do
     before { admin }
 
     context 'when unauthenticated' do
@@ -549,7 +585,7 @@ describe API::API, api: true  do
     end
   end
 
-  describe 'DELETE /user/:uid/emails/:id' do
+  describe 'DELETE /user/:id/emails/:email_id' do
     before { admin }
 
     context 'when unauthenticated' do
@@ -664,7 +700,7 @@ describe API::API, api: true  do
     end
   end
 
-  describe "GET /user/keys/:id" do
+  describe "GET /user/keys/:key_id" do
     it "returns single key" do
       user.keys << key
       user.save
@@ -677,7 +713,7 @@ describe API::API, api: true  do
       get api("/user/keys/42", user)
 
       expect(response).to have_http_status(404)
-      expect(json_response['message']).to eq('404 Not found')
+      expect(json_response['message']).to eq('404 Key Not Found')
     end
 
     it "returns 404 error if admin accesses user's ssh key" do
@@ -686,7 +722,7 @@ describe API::API, api: true  do
       admin
       get api("/user/keys/#{key.id}", admin)
       expect(response).to have_http_status(404)
-      expect(json_response['message']).to eq('404 Not found')
+      expect(json_response['message']).to eq('404 Key Not Found')
     end
 
     it "returns 404 for invalid ID" do
@@ -712,14 +748,16 @@ describe API::API, api: true  do
 
     it "does not create ssh key without key" do
       post api("/user/keys", user), title: 'title'
+
       expect(response).to have_http_status(400)
-      expect(json_response['message']).to eq('400 (Bad request) "key" not given')
+      expect(json_response['error']).to eq('key is missing')
     end
 
     it 'does not create ssh key without title' do
       post api('/user/keys', user), key: 'some key'
+
       expect(response).to have_http_status(400)
-      expect(json_response['message']).to eq('400 (Bad request) "title" not given')
+      expect(json_response['error']).to eq('title is missing')
     end
 
     it "does not create ssh key without title" do
@@ -728,7 +766,7 @@ describe API::API, api: true  do
     end
   end
 
-  describe "DELETE /user/keys/:id" do
+  describe "DELETE /user/keys/:key_id" do
     it "deletes existed key" do
       user.keys << key
       user.save
@@ -738,9 +776,11 @@ describe API::API, api: true  do
       expect(response).to have_http_status(200)
     end
 
-    it "returns success if key ID not found" do
+    it "returns 404 if key ID not found" do
       delete api("/user/keys/42", user)
-      expect(response).to have_http_status(200)
+
+      expect(response).to have_http_status(404)
+      expect(json_response['message']).to eq('404 Key Not Found')
     end
 
     it "returns 401 error if unauthorized" do
@@ -777,7 +817,7 @@ describe API::API, api: true  do
     end
   end
 
-  describe "GET /user/emails/:id" do
+  describe "GET /user/emails/:email_id" do
     it "returns single email" do
       user.emails << email
       user.save
@@ -789,7 +829,7 @@ describe API::API, api: true  do
     it "returns 404 Not Found within invalid ID" do
       get api("/user/emails/42", user)
       expect(response).to have_http_status(404)
-      expect(json_response['message']).to eq('404 Not found')
+      expect(json_response['message']).to eq('404 Email Not Found')
     end
 
     it "returns 404 error if admin accesses user's email" do
@@ -798,7 +838,7 @@ describe API::API, api: true  do
       admin
       get api("/user/emails/#{email.id}", admin)
       expect(response).to have_http_status(404)
-      expect(json_response['message']).to eq('404 Not found')
+      expect(json_response['message']).to eq('404 Email Not Found')
     end
 
     it "returns 404 for invalid ID" do
@@ -824,12 +864,13 @@ describe API::API, api: true  do
 
     it "does not create email with invalid email" do
       post api("/user/emails", user), {}
+
       expect(response).to have_http_status(400)
-      expect(json_response['message']).to eq('400 (Bad request) "email" not given')
+      expect(json_response['error']).to eq('email is missing')
     end
   end
 
-  describe "DELETE /user/emails/:id" do
+  describe "DELETE /user/emails/:email_id" do
     it "deletes existed email" do
       user.emails << email
       user.save
@@ -839,9 +880,11 @@ describe API::API, api: true  do
       expect(response).to have_http_status(200)
     end
 
-    it "returns success if email ID not found" do
+    it "returns 404 if email ID not found" do
       delete api("/user/emails/42", user)
-      expect(response).to have_http_status(200)
+
+      expect(response).to have_http_status(404)
+      expect(json_response['message']).to eq('404 Email Not Found')
     end
 
     it "returns 401 error if unauthorized" do
@@ -851,10 +894,10 @@ describe API::API, api: true  do
       expect(response).to have_http_status(401)
     end
 
-    it "returns a 404 for invalid ID" do
-      delete api("/users/emails/ASDF", admin)
+    it "returns 400 for invalid ID" do
+      delete api("/user/emails/ASDF", admin)
 
-      expect(response).to have_http_status(404)
+      expect(response).to have_http_status(400)
     end
   end
 
@@ -968,6 +1011,29 @@ describe API::API, api: true  do
           expect(joined_event['project_id'].to_i).to eq(project.id)
           expect(joined_event['author_username']).to eq(user.username)
           expect(joined_event['author']['name']).to eq(user.name)
+        end
+      end
+
+      context 'when there are multiple events from different projects' do
+        let(:second_note) { create(:note_on_issue, project: create(:empty_project)) }
+        let(:third_note) { create(:note_on_issue, project: project) }
+
+        before do
+          second_note.project.add_user(user, :developer)
+
+          [second_note, third_note].each do |note|
+            EventCreateService.new.leave_note(note, user)
+          end
+        end
+
+        it 'returns events in the correct order (from newest to oldest)' do
+          get api("/users/#{user.id}/events", user)
+
+          comment_events = json_response.select { |e| e['action_name'] == 'commented on' }
+
+          expect(comment_events[0]['target_id']).to eq(third_note.id)
+          expect(comment_events[1]['target_id']).to eq(second_note.id)
+          expect(comment_events[2]['target_id']).to eq(note.id)
         end
       end
     end

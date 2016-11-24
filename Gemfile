@@ -26,7 +26,7 @@ gem 'omniauth-bitbucket',     '~> 0.0.2'
 gem 'omniauth-cas3',          '~> 1.1.2'
 gem 'omniauth-facebook',      '~> 4.0.0'
 gem 'omniauth-github',        '~> 1.1.1'
-gem 'omniauth-gitlab',        '~> 1.0.0'
+gem 'omniauth-gitlab',        '~> 1.0.2'
 gem 'omniauth-google-oauth2', '~> 0.4.1'
 gem 'omniauth-kerberos',      '~> 0.3.0', group: :kerberos
 gem 'omniauth-saml',          '~> 1.7.0'
@@ -55,7 +55,7 @@ gem 'browser', '~> 2.2'
 
 # Extracting information from a git repository
 # Provide access to Gitlab::Git library
-gem 'gitlab_git', '~> 10.6.8'
+gem 'gitlab_git', '~> 10.7.0'
 
 # LDAP Auth
 # GitLab fork with several improvements to original library. For full list of changes
@@ -110,11 +110,11 @@ gem 'gitlab-elasticsearch-git', '~> 1.0.1', require: "elasticsearch/git"
 
 # Markdown and HTML processing
 gem 'html-pipeline',      '~> 1.11.0'
-gem 'deckar01-task_list', '1.0.5', require: 'task_list/railtie'
+gem 'deckar01-task_list', '1.0.6', require: 'task_list/railtie'
 gem 'gitlab-markup',      '~> 1.5.0'
 gem 'redcarpet',          '~> 3.3.3'
 gem 'RedCloth',           '~> 4.3.2'
-gem 'rdoc',               '~>3.6'
+gem 'rdoc',               '~> 4.2'
 gem 'org-ruby',           '~> 0.9.12'
 gem 'creole',             '~> 0.5.0'
 gem 'wikicloth',          '0.8.1'
@@ -127,7 +127,7 @@ gem 'truncato',           '~> 0.7.8'
 gem 'nokogiri', '~> 1.6.7', '>= 1.6.7.2'
 
 # Diffs
-gem 'diffy', '~> 3.0.3'
+gem 'diffy', '~> 3.1.0'
 
 # Application server
 group :unicorn do
@@ -147,6 +147,7 @@ gem 'acts-as-taggable-on', '~> 4.0'
 gem 'sidekiq', '~> 4.2'
 gem 'sidekiq-cron', '~> 0.4.0'
 gem 'redis-namespace', '~> 1.5.2'
+gem 'sidekiq-limit_fetch', '~> 3.4'
 
 # HTTP requests
 gem 'httparty', '~> 0.13.3'
@@ -162,7 +163,7 @@ gem 'settingslogic', '~> 2.0.9'
 gem 'version_sorter', '~> 2.1.0'
 
 # Cache
-gem 'redis-rails', '~> 4.0.0'
+gem 'redis-rails', '~> 5.0.1'
 
 # Redis
 gem 'redis', '~> 3.2'
@@ -170,6 +171,9 @@ gem 'connection_pool', '~> 2.0'
 
 # HipChat integration
 gem 'hipchat', '~> 1.5.0'
+
+# JIRA integration
+gem 'jira-ruby', '~> 1.1.2'
 
 # Flowdock integration
 gem 'gitlab-flowdock-git-hook', '~> 1.0.1'
@@ -203,7 +207,7 @@ gem 'loofah', '~> 2.0.3'
 gem 'licensee', '~> 8.0.0'
 
 # Protect against bruteforcing
-gem 'rack-attack', '~> 4.3.1'
+gem 'rack-attack', '~> 4.4.1'
 
 # Ace editor
 gem 'ace-rails-ap', '~> 4.1.0'
@@ -267,9 +271,6 @@ group :development do
   # Better errors handler
   gem 'better_errors', '~> 1.0.1'
   gem 'binding_of_caller', '~> 0.7.2'
-
-  # Docs generator
-  gem 'sdoc', '~> 0.3.20'
 
   # thin instead webrick
   gem 'thin', '~> 1.7.0'
@@ -337,15 +338,12 @@ gem 'newrelic_rpm', '~> 3.16'
 
 gem 'octokit', '~> 4.3.0'
 
-gem 'mail_room', '~> 0.8.1'
+gem 'mail_room', '~> 0.9.0'
 
 gem 'email_reply_parser', '~> 0.5.8'
+gem 'html2text'
 
 gem 'ruby-prof', '~> 0.16.2'
-
-## CI
-gem 'activerecord-session_store', '~> 1.0.0'
-gem 'nested_form', '~> 0.3.2'
 
 # OAuth
 gem 'oauth2', '~> 1.2.0'

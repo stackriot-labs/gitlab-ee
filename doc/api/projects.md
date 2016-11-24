@@ -89,6 +89,7 @@ Parameters:
     "public_builds": true,
     "shared_with_groups": [],
     "only_allow_merge_if_build_succeeds": false,
+    "only_allow_merge_if_all_discussions_are_resolved": false,
     "request_access_enabled": false
   },
   {
@@ -151,6 +152,7 @@ Parameters:
     "public_builds": true,
     "shared_with_groups": [],
     "only_allow_merge_if_build_succeeds": false,
+    "only_allow_merge_if_all_discussions_are_resolved": false,
     "request_access_enabled": false
   }
 ]
@@ -429,8 +431,9 @@ Parameters:
     }
   ],
   "repository_storage": "default",
-  "request_access_enabled": false,
-  "only_allow_merge_if_build_succeeds": false
+  "only_allow_merge_if_build_succeeds": false,
+  "only_allow_merge_if_all_discussions_are_resolved": false,
+  "request_access_enabled": false
 }
 ```
 
@@ -599,11 +602,12 @@ Parameters:
 | `container_registry_enabled` | boolean | no | Enable container registry for this project |
 | `shared_runners_enabled` | boolean | no | Enable shared runners for this project |
 | `public` | boolean | no | If `true`, the same as setting `visibility_level` to 20 |
-| `visibility_level` | integer | no | See [project visibility level][#project-visibility-level] |
+| `visibility_level` | integer | no | See [project visibility level](#project-visibility-level) |
 | `import_url` | string | no | URL to import repository from |
 | `public_builds` | boolean | no | If `true`, builds can be viewed by non-project-members |
 | `repository_storage` | string | no | Which storage shard the repository is on. Available only to admins |
 | `only_allow_merge_if_build_succeeds` | boolean | no | Set whether merge requests can only be merged with successful builds |
+| `only_allow_merge_if_all_discussions_are_resolved` | boolean | no | Set whether merge requests can only be merged when all the discussions are resolved |
 | `lfs_enabled` | boolean | no | Enable LFS |
 | `request_access_enabled` | boolean | no | Allow users to request member access |
 
@@ -632,11 +636,12 @@ Parameters:
 | `container_registry_enabled` | boolean | no | Enable container registry for this project |
 | `shared_runners_enabled` | boolean | no | Enable shared runners for this project |
 | `public` | boolean | no | If `true`, the same as setting `visibility_level` to 20 |
-| `visibility_level` | integer | no | See [project visibility level][#project-visibility-level] |
+| `visibility_level` | integer | no | See [project visibility level](#project-visibility-level) |
 | `import_url` | string | no | URL to import repository from |
 | `public_builds` | boolean | no | If `true`, builds can be viewed by non-project-members |
 | `repository_storage` | string | no | Which storage shard the repository is on. Available only to admins |
 | `only_allow_merge_if_build_succeeds` | boolean | no | Set whether merge requests can only be merged with successful builds |
+| `only_allow_merge_if_all_discussions_are_resolved` | boolean | no | Set whether merge requests can only be merged when all the discussions are resolved |
 | `lfs_enabled` | boolean | no | Enable LFS |
 | `request_access_enabled` | boolean | no | Allow users to request member access |
 
@@ -664,11 +669,12 @@ Parameters:
 | `container_registry_enabled` | boolean | no | Enable container registry for this project |
 | `shared_runners_enabled` | boolean | no | Enable shared runners for this project |
 | `public` | boolean | no | If `true`, the same as setting `visibility_level` to 20 |
-| `visibility_level` | integer | no | See [project visibility level][#project-visibility-level] |
+| `visibility_level` | integer | no | See [project visibility level](#project-visibility-level) |
 | `import_url` | string | no | URL to import repository from |
 | `public_builds` | boolean | no | If `true`, builds can be viewed by non-project-members |
 | `repository_storage` | string | no | Change the storage shard for the repository. Available only to admins |
 | `only_allow_merge_if_build_succeeds` | boolean | no | Set whether merge requests can only be merged with successful builds |
+| `only_allow_merge_if_all_discussions_are_resolved` | boolean | no | Set whether merge requests can only be merged when all the discussions are resolved |
 | `lfs_enabled` | boolean | no | Enable LFS |
 | `request_access_enabled` | boolean | no | Allow users to request member access |
 
@@ -756,6 +762,7 @@ Example response:
   "public_builds": true,
   "shared_with_groups": [],
   "only_allow_merge_if_build_succeeds": false,
+  "only_allow_merge_if_all_discussions_are_resolved": false,
   "request_access_enabled": false
 }
 ```
@@ -824,6 +831,7 @@ Example response:
   "public_builds": true,
   "shared_with_groups": [],
   "only_allow_merge_if_build_succeeds": false,
+  "only_allow_merge_if_all_discussions_are_resolved": false,
   "request_access_enabled": false
 }
 ```
@@ -846,7 +854,7 @@ POST /projects/:id/archive
 | `id` | integer/string | yes | The ID of the project or NAMESPACE/PROJECT_NAME |
 
 ```bash
-curl --request POST --header "PRIVATE-TOKEN: 9koXpg98eAheJpvBs5tK" "https://gitlab.example.com/api/v3/projects/archive"
+curl --request POST --header "PRIVATE-TOKEN: 9koXpg98eAheJpvBs5tK" "https://gitlab.example.com/api/v3/projects/5/archive"
 ```
 
 Example response:
@@ -912,6 +920,7 @@ Example response:
   "public_builds": true,
   "shared_with_groups": [],
   "only_allow_merge_if_build_succeeds": false,
+  "only_allow_merge_if_all_discussions_are_resolved": false,
   "request_access_enabled": false
 }
 ```
@@ -934,7 +943,7 @@ POST /projects/:id/unarchive
 | `id` | integer/string | yes | The ID of the project or NAMESPACE/PROJECT_NAME |
 
 ```bash
-curl --request POST --header "PRIVATE-TOKEN: 9koXpg98eAheJpvBs5tK" "https://gitlab.example.com/api/v3/projects/unarchive"
+curl --request POST --header "PRIVATE-TOKEN: 9koXpg98eAheJpvBs5tK" "https://gitlab.example.com/api/v3/projects/5/unarchive"
 ```
 
 Example response:
@@ -1000,6 +1009,7 @@ Example response:
   "public_builds": true,
   "shared_with_groups": [],
   "only_allow_merge_if_build_succeeds": false,
+  "only_allow_merge_if_all_discussions_are_resolved": false,
   "request_access_enabled": false
 }
 ```
@@ -1143,6 +1153,7 @@ Parameters:
 | `pipeline_events` | boolean | no | Trigger hook on pipeline events |
 | `wiki_events` | boolean | no | Trigger hook on wiki events |
 | `enable_ssl_verification` | boolean | no | Do SSL verification when triggering the hook |
+| `token` | string | no | Secret token to validate received payloads; this will not be returned in the response |
 
 ### Edit project hook
 
@@ -1168,6 +1179,7 @@ Parameters:
 | `pipeline_events` | boolean | no | Trigger hook on pipeline events |
 | `wiki_events` | boolean | no | Trigger hook on wiki events |
 | `enable_ssl_verification` | boolean | no | Do SSL verification when triggering the hook |
+| `token` | string | no | Secret token to validate received payloads; this will not be returned in the response |
 
 ### Delete project hook
 

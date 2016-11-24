@@ -62,9 +62,10 @@ update-knapsack:
     - scripts/merge-reports knapsack/spinach_report.json knapsack/spinach_node_*.json
     - rm -f knapsack/*_node_*.json
   only:
-    - master
-
-# Execute all testing suites
+    - master@gitlab-org/gitlab-ce
+    - master@gitlab-org/gitlab-ee
+    - master@gitlab/gitlabhq
+    - master@gitlab/gitlab-ee
 
 .use-db: &use-db
   services:
@@ -72,11 +73,23 @@ update-knapsack:
     - redis:alpine
     - registry.gitlab.com/gitlab-org/test-elastic-image
 
+setup-test-env:
+  <<: *use-db
+  stage: prepare
+  script:
+    - bundle exec rake assets:precompile 2>/dev/null
+    - bundle exec ruby -Ispec -e 'require "spec_helper" ; TestEnv.init'
+  artifacts:
+    expire_in: 7d
+    paths:
+      - public/assets
+      - tmp/tests
+
+
 .rspec-knapsack: &rspec-knapsack
   stage: test
   <<: *use-db
   script:
-    - bundle exec rake assets:precompile 2>/dev/null
     - JOB_NAME=( $CI_BUILD_NAME )
     - export CI_NODE_INDEX=${JOB_NAME[1]}
     - export CI_NODE_TOTAL=${JOB_NAME[2]}
@@ -94,7 +107,6 @@ update-knapsack:
   stage: test
   <<: *use-db
   script:
-    - bundle exec rake assets:precompile 2>/dev/null
     - JOB_NAME=( $CI_BUILD_NAME )
     - export CI_NODE_INDEX=${JOB_NAME[1]}
     - export CI_NODE_TOTAL=${JOB_NAME[2]}
@@ -145,7 +157,10 @@ spinach 9 10: *spinach-knapsack
   image: "dev.gitlab.org:5005/gitlab/gitlab-build-images:ruby-2.1-git-2.7-phantomjs-2.1"
   <<: *use-db
   only:
-    - master
+    - master@gitlab-org/gitlab-ce
+    - master@gitlab-org/gitlab-ee
+    - master@gitlab/gitlabhq
+    - master@gitlab/gitlab-ee
   cache:
     key: "ruby21"
     paths:
@@ -243,7 +258,7 @@ teaspoon:
     - curl --silent --location https://deb.nodesource.com/setup_6.x | bash -
     - apt-get install --assume-yes nodejs
     - npm install --global istanbul
-    - teaspoon
+    - rake teaspoon
   artifacts:
     name: coverage-javascript
     expire_in: 31d
@@ -267,23 +282,32 @@ bundler:audit:
   stage: test
   <<: *ruby-static-analysis
   only:
-    - master
+    - master@gitlab-org/gitlab-ce
+    - master@gitlab-org/gitlab-ee
+    - master@gitlab/gitlabhq
+    - master@gitlab/gitlab-ee
   script:
     - "bundle exec bundle-audit check --update --ignore OSVDB-115941"
 
 migration paths:
   stage: test
   <<: *use-db
+  variables:
+    SETUP_DB: "false"
   only:
     - master@gitlab-org/gitlab-ce
+    - master@gitlab-org/gitlab-ee
+    - master@gitlab/gitlabhq
+    - master@gitlab/gitlab-ee
   script:
-    - git checkout HEAD .
-    - git fetch --tags
-    - git checkout v8.5.9
-    - 'echo test: unix:/var/opt/gitlab/redis/redis.socket > config/resque.yml'
-    - bundle install --without postgres production --jobs $(nproc) "${FLAGS[@]}" --retry=3
+    - git fetch origin v8.5.9
+    - git checkout -f FETCH_HEAD
+    - cp config/resque.yml.example config/resque.yml
+    - sed -i 's/localhost/redis/g' config/resque.yml
+    - bundle install --without postgres production --jobs $(nproc) ${FLAGS[@]} --retry=3
     - rake db:drop db:create db:schema:load db:seed_fu
     - git checkout $CI_BUILD_REF
+    - source scripts/prepare_build.sh
     - rake db:migrate
 
 coverage:
@@ -301,6 +325,14 @@ coverage:
     - coverage/index.html
     - coverage/assets/
 
+lint-javascript:
+  stage: test
+  image: "node:latest"
+  before_script:
+    - npm install
+  script:
+    - npm run eslint
+
 # Trigger docs build
 # https://gitlab.com/gitlab-com/doc-gitlab-com/blob/master/README.md#deployment-process
 trigger_docs:
@@ -313,7 +345,7 @@ trigger_docs:
   cache: {}
   artifacts: {}
   script:
-    - "curl -X POST -F token=${DOCS_TRIGGER_TOKEN} -F ref=master -F variables[PROJECT]=ee https://gitlab.com/api/v3/projects/38069/trigger/builds"
+    - "curl -X POST -F token=${DOCS_TRIGGER_TOKEN} -F ref=master -F variables[PROJECT]=ee https://gitlab.com/api/v3/projects/1794617/trigger/builds"
   only:
     - master@gitlab-org/gitlab-ee
 

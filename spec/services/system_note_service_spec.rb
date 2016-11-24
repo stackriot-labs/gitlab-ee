@@ -1,6 +1,8 @@
 require 'spec_helper'
 
 describe SystemNoteService, services: true do
+  include Gitlab::Routing.url_helpers
+
   let(:project)  { create(:project) }
   let(:author)   { create(:user) }
   let(:noteable) { create(:issue, project: project) }
@@ -538,52 +540,140 @@ describe SystemNoteService, services: true do
   include JiraServiceHelper
 
   describe 'JIRA integration' do
-    let(:project)    { create(:jira_project) }
-    let(:author)     { create(:user) }
-    let(:issue)      { create(:issue, project: project) }
-    let(:mergereq)   { create(:merge_request, :simple, target_project: project, source_project: project) }
-    let(:jira_issue) { ExternalIssue.new("JIRA-1", project)}
-    let(:jira_tracker) { project.jira_service }
-    let(:commit)     { project.repository.commits('master').find { |commit| commit.id == '5937ac0a7beb003549fc5fd26fc247adbce4a52e' } }
+    let(:project)         { create(:jira_project) }
+    let(:author)          { create(:user) }
+    let(:issue)           { create(:issue, project: project) }
+    let(:merge_request)        { create(:merge_request, :simple, target_project: project, source_project: project) }
+    let(:jira_issue)      { ExternalIssue.new("JIRA-1", project)}
+    let(:jira_tracker)    { project.jira_service }
+    let(:commit)          { project.commit }
+    let(:comment_url)     { jira_api_comment_url(jira_issue.id) }
+    let(:success_message) { "JiraService SUCCESS: Successfully posted to http://jira.example.net." }
 
-    context 'in JIRA issue tracker' do
-      before do
-        jira_service_settings
-        WebMock.stub_request(:post, jira_api_comment_url)
-      end
+    before do
+      stub_jira_urls(jira_issue.id)
+      jira_service_settings
+    end
 
-      describe "new reference" do
-        before do
-          WebMock.stub_request(:get, jira_api_comment_url).to_return(body: jira_issue_comments)
+    noteable_types = ["merge_requests", "commit"]
+
+    noteable_types.each do |type|
+      context "when noteable is a #{type}" do
+        it "blocks cross reference when #{type.underscore}_events is false" do
+          jira_tracker.update("#{type}_events" => false)
+
+          noteable = type == "commit" ? commit : merge_request
+          result = described_class.cross_reference(jira_issue, noteable, author)
+
+          expect(result).to eq("Events for #{noteable.class.to_s.underscore.humanize.pluralize.downcase} are disabled.")
         end
 
-        subject { described_class.cross_reference(jira_issue, commit, author) }
+        it "blocks cross reference when #{type.underscore}_events is true" do
+          jira_tracker.update("#{type}_events" => true)
 
-        it { is_expected.to eq(jira_status_message) }
-      end
+          noteable = type == "commit" ? commit : merge_request
+          result = described_class.cross_reference(jira_issue, noteable, author)
 
-      describe "existing reference" do
-        before do
-          message = %Q{[#{author.name}|http://localhost/#{author.username}] mentioned this issue in [a commit of #{project.path_with_namespace}|http://localhost/#{project.path_with_namespace}/commit/#{commit.id}]:\\n'#{commit.title}'}
-          WebMock.stub_request(:get, jira_api_comment_url).to_return(body: %Q({"comments":[{"body":"#{message}"}]}))
+          expect(result).to eq(success_message)
         end
-
-        subject { described_class.cross_reference(jira_issue, commit, author) }
-        it { is_expected.not_to eq(jira_status_message) }
       end
     end
 
-    context 'issue from an issue' do
-      context 'in JIRA issue tracker' do
-        before do
-          jira_service_settings
-          WebMock.stub_request(:post, jira_api_comment_url)
-          WebMock.stub_request(:get, jira_api_comment_url).to_return(body: jira_issue_comments)
+    describe "new reference" do
+      context 'for commits' do
+        it "creates comment" do
+          result = described_class.cross_reference(jira_issue, commit, author)
+
+          expect(result).to eq(success_message)
         end
 
-        subject { described_class.cross_reference(jira_issue, issue, author) }
+        it "creates remote link" do
+          described_class.cross_reference(jira_issue, commit, author)
 
-        it { is_expected.to eq(jira_status_message) }
+          expect(WebMock).to have_requested(:post, jira_api_remote_link_url(jira_issue)).with(
+            body: hash_including(
+              GlobalID: "GitLab",
+              object: {
+                url: namespace_project_commit_url(project.namespace, project, commit),
+                title: "GitLab: Mentioned on commit - #{commit.title}",
+                icon: { title: "GitLab", url16x16: "https://gitlab.com/favicon.ico" },
+                status: { resolved: false }
+              }
+            )
+          ).once
+        end
+      end
+
+      context 'for issues' do
+        let(:issue)           { create(:issue, project: project) }
+
+        it "creates comment" do
+          result = described_class.cross_reference(jira_issue, issue, author)
+
+          expect(result).to eq(success_message)
+        end
+
+        it "creates remote link" do
+          described_class.cross_reference(jira_issue, issue, author)
+
+          expect(WebMock).to have_requested(:post, jira_api_remote_link_url(jira_issue)).with(
+            body: hash_including(
+              GlobalID: "GitLab",
+              object: {
+                url: namespace_project_issue_url(project.namespace, project, issue),
+                title: "GitLab: Mentioned on issue - #{issue.title}",
+                icon: { title: "GitLab", url16x16: "https://gitlab.com/favicon.ico" },
+                status: { resolved: false }
+              }
+            )
+          ).once
+        end
+      end
+
+      context 'for snippets' do
+        let(:snippet) { create(:snippet, project: project) }
+
+        it "creates comment" do
+          result = described_class.cross_reference(jira_issue, snippet, author)
+
+          expect(result).to eq(success_message)
+        end
+
+        it "creates remote link" do
+          described_class.cross_reference(jira_issue, snippet, author)
+
+          expect(WebMock).to have_requested(:post, jira_api_remote_link_url(jira_issue)).with(
+            body: hash_including(
+              GlobalID: "GitLab",
+              object: {
+                url: namespace_project_snippet_url(project.namespace, project, snippet),
+                title: "GitLab: Mentioned on snippet - #{snippet.title}",
+                icon: { title: "GitLab", url16x16: "https://gitlab.com/favicon.ico" },
+                status: { resolved: false }
+              }
+            )
+          ).once
+        end
+      end
+    end
+
+    describe "existing reference" do
+      before do
+        message = "[#{author.name}|http://localhost/#{author.username}] mentioned this issue in [a commit of #{project.path_with_namespace}|http://localhost/#{project.path_with_namespace}/commit/#{commit.id}]:\n'#{commit.title}'"
+        allow_any_instance_of(JIRA::Resource::Issue).to receive(:comments).and_return([OpenStruct.new(body: message)])
+      end
+
+      it "does not return success message" do
+        result = described_class.cross_reference(jira_issue, commit, author)
+
+        expect(result).not_to eq(success_message)
+      end
+
+      it 'does not try to create comment and remote link' do
+        subject
+
+        expect(WebMock).not_to have_requested(:post, jira_api_comment_url(jira_issue))
+        expect(WebMock).not_to have_requested(:post, jira_api_remote_link_url(jira_issue))
       end
     end
   end
@@ -598,6 +688,71 @@ describe SystemNoteService, services: true do
       it 'sets the note text' do
         expect(subject.note).to eq "Approved this merge request"
       end
+    end
+  end
+
+  describe '.change_time_estimate' do
+    subject { described_class.change_time_estimate(noteable, project, author) }
+
+    it_behaves_like 'a system note'
+
+    context 'with a time estimate' do
+      it 'sets the note text' do
+        noteable.update_attribute(:time_estimate, 277200)
+
+        expect(subject.note).to eq "Changed time estimate of this issue to 1w 4d 5h"
+      end
+    end
+
+    context 'without a time estimate' do
+      it 'sets the note text' do
+        expect(subject.note).to eq "Removed time estimate on this issue"
+      end
+    end
+  end
+
+  describe '.change_time_spent' do
+    # We need a custom noteable in order to the shared examples to be green.
+    let(:noteable) do
+      mr = create(:merge_request, source_project: project)
+      mr.spend_time(1, author)
+      mr.save!
+      mr
+    end
+
+    subject do
+      described_class.change_time_spent(noteable, project, author)
+    end
+
+    it_behaves_like 'a system note'
+
+    context 'when time was added' do
+      it 'sets the note text' do
+        spend_time!(277200)
+
+        expect(subject.note).to eq "Added 1w 4d 5h of time spent on this merge request"
+      end
+    end
+
+    context 'when time was subtracted' do
+      it 'sets the note text' do
+        spend_time!(-277200)
+
+        expect(subject.note).to eq "Subtracted 1w 4d 5h of time spent on this merge request"
+      end
+    end
+
+    context 'when time was removed' do
+      it 'sets the note text' do
+        spend_time!(:reset)
+
+        expect(subject.note).to eq "Removed time spent on this merge request"
+      end
+    end
+
+    def spend_time!(seconds)
+      noteable.spend_time(seconds, author)
+      noteable.save!
     end
   end
 end

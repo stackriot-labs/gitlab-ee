@@ -15,6 +15,7 @@ issues:
 - events
 - merge_requests_closing_issues
 - metrics
+- timelogs
 events:
 - author
 - project
@@ -80,6 +81,7 @@ merge_requests:
 - approvals
 - approvers
 - approver_groups
+- timelogs
 merge_request_diff:
 - merge_request
 pipelines:
@@ -123,6 +125,7 @@ project:
 - base_tags
 - tag_taggings
 - tags
+- chat_services
 - creator
 - group
 - namespace
@@ -134,6 +137,7 @@ project:
 - emails_on_push_service
 - builds_email_service
 - pipelines_email_service
+- mattermost_slash_commands_service
 - irker_service
 - pivotaltracker_service
 - hipchat_service
@@ -207,3 +211,6 @@ award_emoji:
 - user
 priorities:
 - label
+timelogs:
+- trackable
+- user

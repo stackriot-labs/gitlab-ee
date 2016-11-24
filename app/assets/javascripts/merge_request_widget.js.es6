@@ -1,3 +1,4 @@
+/* eslint-disable */
  ((global) => {
   var indexOf = [].indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; };
 
@@ -105,7 +106,7 @@
               callback = function() {
                 return merge_request_widget.mergeInProgress(deleteSourceBranch);
               };
-              return setTimeout(callback, 1000);
+              return setTimeout(callback, 2000);
             }
           };
         })(this),
@@ -228,13 +229,13 @@
         if ($(`.mr-state-widget #${ environment.id }`).length) return;
         const $template = $(DEPLOYMENT_TEMPLATE);
         if (!environment.external_url || !environment.external_url_formatted) $('.js-environment-link', $template).remove();
-        
+
         if (!environment.stop_url) {
           $('.js-stop-env-link', $template).remove();
         }
-        
+
         if (environment.deployed_at && environment.deployed_at_formatted) {
-          environment.deployed_at = $.timeago(environment.deployed_at) + '.';
+          environment.deployed_at = gl.utils.getTimeago().format(environment.deployed_at, 'gl_en') + '.';
         } else {
           $('.js-environment-timeago', $template).remove();
           environment.name += '.';

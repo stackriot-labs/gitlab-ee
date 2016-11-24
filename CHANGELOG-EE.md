@@ -1,25 +1,65 @@
 Please view this file on the master branch, on stable branches it's out of date.
 
 ## 8.14.0 (2016-11-22)
-  - gitlab:check rake task checks ES version according to requirements
 
+- Added Backfill service for Geo. !861
+- Fix for autosuggested approvers(https://gitlab.com/gitlab-org/gitlab-ee/issues/1273).
+- Gracefully recover from previously failed rebase.
+- Disable retries for remote mirror update worker. !848
+- Fix Approvals API documentation.
+- Add ability to set approvals_before_merge for project through the API.
+- gitlab:check rake task checks ES version according to requirements
+- Convert ASCII-8BIT LDAP DNs to UTF-8 to avoid unnecessary user deletions
+- [Fix] Only owner can see "Projects" button in group edit menu
+
+## 8.13.6 (2016-11-17)
+
+- Disable retries for remote mirror update worker. !848
+- Fixed cache clearing on secondary Geo nodes. !869
+- Geo: fix a problem that prevented git cloning from secondary node. !873
+
+## 8.13.5 (2016-11-08)
+
+- No changes
+
+## 8.13.4 (2016-11-07)
+
+- Weight dropdown in issue filter form does not stay selected. !826
+
+## 8.13.3 (2016-11-02)
+
+- No changes
+
+## 8.13.2 (2016-10-31)
+
+- Don't pass a current user to Member#add_user in LDAP group sync. !830
 
 ## 8.13.1 (2016-10-25)
-  - Hide multiple board actions if user doesnt have permissions. !816
-  - Fix Elasticsearch::Transport::Transport::Errors::BadRequest when ES is enabled. !818
+
+- Hide multiple board actions if user doesnt have permissions. !816
+- Fix Elasticsearch::Transport::Transport::Errors::BadRequest when ES is enabled. !818
 
 ## 8.13.0 (2016-10-22)
-  - Cache the last usage data to avoid unicorn timeouts
-  - Add user activity table and service to query for active users
-  - Fix 500 error updating mirror URLs for projects
-  - Restrict protected branch access to specific groups !645
-  - Fix validations related to mirroring settings form. !773
-  - Add multiple issue boards. !782
-  - Fix Git access panel for Wikis when Kerberos authentication is enabled (Borja Aparicio)
-  - Decrease maximum time that GitLab waits for a mirror to finish !791 (Borja Aparicio)
-  - User groups (that can be assigned as approvers)
-  - Fix a search for non-default branches when ES is enabled
-  - Re-organized the Sidekiq queues for EE specific workers
+
+- Cache the last usage data to avoid unicorn timeouts
+- Add user activity table and service to query for active users
+- Fix 500 error updating mirror URLs for projects
+- Restrict protected branch access to specific groups !645
+- Fix validations related to mirroring settings form. !773
+- Add multiple issue boards. !782
+- Fix Git access panel for Wikis when Kerberos authentication is enabled (Borja Aparicio)
+- Decrease maximum time that GitLab waits for a mirror to finish !791 (Borja Aparicio)
+- User groups (that can be assigned as approvers)
+- Fix a search for non-default branches when ES is enabled
+- Re-organized the Sidekiq queues for EE specific workers
+
+## 8.12.9 (2016-11-07)
+
+- No changes
+
+## 8.12.8 (2016-11-02)
+
+- No changes
 
 ## 8.12.7
 
@@ -65,6 +105,14 @@ Please view this file on the master branch, on stable branches it's out of date.
   - [ES] Global code search
   - [ES] Improve logging
   - Fix projects with remote mirrors asynchronously destruction
+
+## 8.11.11 (2016-11-07)
+
+- No changes
+
+## 8.11.10 (2016-11-02)
+
+- No changes
 
 ## 8.11.9
 

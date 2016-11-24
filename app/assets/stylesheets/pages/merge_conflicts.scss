@@ -101,7 +101,8 @@ $colors: (
 
 
 @mixin color-scheme($color) {
-  .header.line_content, .diff-line-num {
+  .header.line_content,
+  .diff-line-num {
     &.origin {
       background-color: map-get($colors, #{$color}_header_origin_neutral);
       border-color: map-get($colors, #{$color}_header_origin_neutral);
@@ -227,7 +228,6 @@ $colors: (
       position: absolute;
       right: 10px;
       padding: 0;
-      outline: none;
       color: #fff;
       width: 75px; // static width to make 2 buttons have same width
       height: 19px;

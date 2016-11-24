@@ -12,6 +12,10 @@
   opacity: 1!important;
 
   * {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
     // !important to make sure no style can override this when dragging
     cursor: -webkit-grabbing!important;
     cursor: grabbing!important;
@@ -47,6 +51,10 @@
   }
 }
 
+.boards-app {
+  position: relative;
+}
+
 .boards-app-loading {
   width: 100%;
   font-size: 34px;
@@ -65,6 +73,10 @@
     height: 409px; // Needed for PhantomJS
     height: calc(100vh - 290px);
     min-height: 409px;
+
+    &.is-compact {
+      width: calc(100% - 290px);
+    }
   }
 }
 
@@ -153,8 +165,12 @@
   }
 }
 
-.board-list {
+.board-list-component {
   height: calc(100% - 49px);
+}
+
+.board-list {
+  height: 100%;
   margin-bottom: 0;
   padding: 5px;
   list-style: none;
@@ -162,7 +178,7 @@
   overflow-x: hidden;
 
   &.is-smaller {
-    height: calc(100% - 185px);
+    height: calc(100% - 136px);
   }
 }
 
@@ -181,6 +197,10 @@
 
   &:not(:last-child) {
     margin-bottom: 5px;
+  }
+
+  &.is-active {
+    background-color: $row-hover;
   }
 
   .label {
@@ -210,6 +230,10 @@
   .label {
     margin-right: 5px;
     font-size: (14px / $issue-boards-font-size) * 1em;
+  }
+
+  .avatar {
+    margin-left: 0;
   }
 }
 
@@ -297,4 +321,49 @@
 .board-delete-btns {
   padding-top: 12px;
   border-top: 1px solid $border-color;
+}
+
+.issue-boards-sidebar {
+  &.right-sidebar {
+    top: 153px;
+    bottom: 0;
+
+    @media (min-width: $screen-sm-min) {
+      top: 220px;
+    }
+  }
+
+  .issuable-sidebar-header {
+    position: relative;
+  }
+
+  .gutter-toggle {
+    position: absolute;
+    top: 0;
+    bottom: 15px;
+    right: 0;
+    width: 22px;
+    color: $gray-darkest;
+
+    svg {
+      position: absolute;
+      top: 50%;
+      margin-top: (-11px / 2);
+    }
+
+    &:hover {
+      path {
+        fill: $gray-darkest;
+      }
+    }
+  }
+
+  .issuable-header-text {
+    width: 100%;
+    padding-right: 35px;
+
+    > strong {
+      font-weight: 600;
+    }
+  }
 }

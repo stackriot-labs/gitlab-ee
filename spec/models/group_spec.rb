@@ -1,7 +1,7 @@
 require 'spec_helper'
 
 describe Group, models: true do
-  let!(:group) { create(:group) }
+  let!(:group) { create(:group, :access_requestable) }
 
   describe 'associations' do
     it { is_expected.to have_many :projects }
@@ -264,5 +264,11 @@ describe Group, models: true do
     group.request_access(members[:requester])
 
     members
+  end
+
+  describe '#web_url' do
+    it 'returns the canonical URL' do
+      expect(group.web_url).to include("groups/#{group.name}")
+    end
   end
 end

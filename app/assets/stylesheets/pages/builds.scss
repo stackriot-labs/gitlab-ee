@@ -14,18 +14,10 @@
     }
   }
 
-  .autoscroll-container {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    z-index: 100;
-  }
-
   .scroll-controls {
-    &.affix-top {
-      position: absolute;
-      top: 10px;
-      right: 25px;
+    .scroll-step {
+      width: 31px;
+      margin: 0 0 0 auto;
     }
 
     &.affix-bottom {
@@ -34,13 +26,13 @@
     }
 
     &.affix {
-      right: 30px;
+      right: 25px;
       bottom: 15px;
       z-index: 1;
+    }
 
-      @media (min-width: $screen-md-min) {
-        right: 26%;
-      }
+    &.sidebar-expanded {
+      right: #{$gutter_width + ($gl-padding * 2)};
     }
 
     a {
@@ -48,22 +40,46 @@
       margin-bottom: 10px;
     }
   }
+
+  .environment-information {
+    background-color: $background-color;
+    border: 1px solid $border-color;
+    padding: 12px $gl-padding;
+    border-radius: $border-radius-default;
+
+    svg {
+      position: relative;
+      top: 1px;
+      margin-right: 5px;
+    }
+  }
 }
 
 .build-header {
   position: relative;
-  padding-right: 40px;
+  padding: 0;
+  display: flex;
+  min-height: 58px;
+  align-items: center;
 
-  @media (min-width: $screen-sm-min) {
-    padding-right: 0;
+  @media (max-width: $screen-sm-max) {
+    padding-right: 40px;
+
+    .btn-inverted {
+      display: none;
+    }
   }
 
-  a {
-    color: $gl-gray;
+  .header-content {
+    flex: 1;
 
-    &:hover {
-      color: $gl-link-color;
-      text-decoration: none;
+    a {
+      color: $gl-gray;
+
+      &:hover {
+        color: $gl-link-color;
+        text-decoration: none;
+      }
     }
   }
 
@@ -137,9 +153,14 @@
 
   .retry-link {
     color: $gl-link-color;
+    display: none;
 
     &:hover {
       text-decoration: underline;
+    }
+
+    @media (max-width: $screen-sm-max) {
+      display: block;
     }
   }
 

@@ -1,3 +1,4 @@
+/* eslint-disable */
 const listObj = {
   id: 1,
   position: 0,
@@ -47,10 +48,10 @@ const BoardsMockData = {
   }
 };
 
-Vue.http.interceptors.push((request, next) => {
+const boardsMockInterceptor = (request, next) => {
   const body = BoardsMockData[request.method][request.url];
 
   next(request.respondWith(JSON.stringify(body), {
     status: 200
   }));
-});
+};
