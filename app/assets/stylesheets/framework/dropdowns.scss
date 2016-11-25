@@ -54,11 +54,16 @@
     }
   }
 
+  &[disabled] {
+    background-color: $input-bg-disabled;
+    cursor: not-allowed;
+  }
+
   &.no-outline {
     outline: 0;
   }
 
-  &:hover, {
+  &:hover:not([disabled]), {
     border-color: $dropdown-toggle-hover-border-color;
 
     .fa {
