@@ -1,5 +1,5 @@
-((app) => {
-  app.helpState = {
+(() => {
+  gl.IssuableTimeTrackingApp.helpState = {
     name: 'time-tracking-help-state',
     props: ['docsUrl'],
     template: `

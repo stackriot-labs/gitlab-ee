@@ -1,4 +1,5 @@
-((app) => {
+(() => {
+  const app = gl.IssuableTimeTrackingApp;
   gl.IssuableTimeTracker = Vue.component('issuable-time-tracker', {
     name: 'issuable-time-tracker',
     props: [
@@ -7,7 +8,7 @@
       'human_time_estimate',
       'human_time_spent',
       'stopwatchSvg',
-      'docsUrl'
+      'docsUrl',
     ],
     data() {
       return {
