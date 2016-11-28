@@ -19,6 +19,7 @@ function initComponent(time_estimate = 100000, time_spent = 5000, human_time_est
     timeSpentHuman: human_time_spent,
     timeEstimate: time_estimate,
     timeSpent: time_spent,
+    docsUrl: '/help/workflow/time_tracking.md',
   };
 
   this.timeTracker = new gl.IssuableTimeTracker({
@@ -167,7 +168,6 @@ function initComponent(time_estimate = 100000, time_spent = 5000, human_time_est
 
           it('should link to the correct documentation', function(done) {
             const correctUrl = '/help/workflow/time_tracking.md'
-
             $(this.timeTracker.$el).find('.help-button').click();
 
             Vue.nextTick(() => {

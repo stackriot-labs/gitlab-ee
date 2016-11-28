@@ -6,7 +6,8 @@
       'time_spent',
       'human_time_estimate',
       'human_time_spent',
-      'stopwatchSvg'
+      'stopwatchSvg',
+      'docsUrl'
     ],
     data() {
       return {
@@ -98,7 +99,8 @@
           </time-tracking-comparison-pane>
           <transition name='help-state-toggle'>
             <time-tracking-help-state
-              v-if='showHelpState'>
+              v-if='showHelpState'
+              :docs-url='docsUrl'>
             </time-tracking-help-state>
           </transition>
         </div>
