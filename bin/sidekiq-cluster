@@ -1,0 +1,16 @@
+#!/usr/bin/env ruby
+
+require 'optparse'
+require 'thread'
+require File.expand_path('../../lib/gitlab/sidekiq_cluster', __FILE__)
+require File.expand_path('../../lib/gitlab/sidekiq_cluster/cli', __FILE__)
+
+Thread.abort_on_exception = true
+
+cli = Gitlab::SidekiqCluster::CLI.new
+
+begin
+  cli.run
+rescue Gitlab::SidekiqCluster::CLI::CommandError => error
+  abort error.message
+end
