@@ -15,7 +15,6 @@ class Project < ActiveRecord::Base
   include Elastic::ProjectsSearch
   include ProjectFeaturesCompatibility
   include SelectForProjectAuthorization
-  include EE::Project
 
   extend Gitlab::ConfigHelper
 
